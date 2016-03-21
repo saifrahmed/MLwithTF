@@ -12,17 +12,17 @@ from six.moves.urllib.request import urlretrieve
 import logging
 
 def load_classes(root):
-    classes = np.array(sorted([os.path.join(root, directory) 
+    class_root_dirs = np.array(sorted([os.path.join(root, directory) 
                                for directory in os.listdir(root) 
                                if os.path.isdir(os.path.join(root, directory))]))
     
-    training_files = np.ndarray(shape=(len(classes),), dtype=object)
+    classes = np.ndarray(shape=(len(class_root_dirs),), dtype=object)
 
-    for index, path_prefix in enumerate(train_dirs):
+    for index, path_prefix in enumerate(class_root_dirs):
         temp_arr = np.array([os.path.join(path_prefix, filename)
                              for filename in os.listdir(path_prefix) 
                              if os.path.isfile(os.path.join(path_prefix, filename))])
 
-        training_files[index] = temp_arr    
+        classes[index] = temp_arr    
     
-    return training_files
+    return classes
