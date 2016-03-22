@@ -97,8 +97,13 @@ def reformat(dataset, labels, image_shape, num_labels, num_channels):
   labels = (np.arange(num_labels) == labels[:,None]).astype(np.float32)
   return dataset, labels
 
+def reformat(dataset, labels, image_shape, num_labels, num_channels):
+  dataset = dataset.reshape(
+    (-1, image_shape[0], image_shape[1], num_channels)).astype(np.float32)
+  labels = (np.arange(num_labels) == labels[:,None]).astype(np.float32)
+  return dataset, labels
+
 def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixel_depth, num_labels, num_channels):
-  """Load the data for a single letter label."""
   
   batch_data = np.ndarray(shape=((batch_size), image_shape[0], image_shape[1]), dtype=np.float32)
     
@@ -121,7 +126,7 @@ def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixe
         image_index += 1
     except IOError as e:
       skipped_images = skipped_images + 1
-      print('Could not read:', image_file, ':', e, '- it\'s ok, skipping.')
+      print('Could not read:', dataset_file_paths[offset + index], ':', e, '- it\'s ok, skipping.')
     index += 1
     
   batch_data = batch_data[0:image_index, :, :]
