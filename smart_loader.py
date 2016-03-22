@@ -91,8 +91,45 @@ def pickle_data(filename,
       print('Unable to save data to', filename, ':', e)
       raise
 
+def reformat(dataset, labels, image_shape, num_labels, num_channels):
+  dataset = dataset.reshape(
+    (-1, image_shape[0], image_shape[1], num_channels)).astype(np.float32)
+  labels = (np.arange(num_labels) == labels[:,None]).astype(np.float32)
+  return dataset, labels
 
+def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixel_depth, num_labels, num_channels):
+  """Load the data for a single letter label."""
+  
+  batch_data = np.ndarray(shape=((batch_size), image_shape[0], image_shape[1]), dtype=np.float32)
+    
+  batch_labels = np.ndarray(shape=(batch_size), dtype=np.int32)
+    
+  image_index = 0
+  skipped_images = 0
+  index = 0
+  length_dataset = len(dataset_file_paths)
+  while image_index < batch_size and (offset + index) < length_dataset:
+    try:
+      image_data = (ndimage.imread(dataset_file_paths[offset + index]).astype(float) - 
+                    pixel_depth / 2) / pixel_depth
+      if image_data.shape != image_shape:
+        skipped_images += 1
+        print('Unexpected image shape: %s' % str(image_data.shape))
+      else:
+        batch_data[image_index, :, :] = image_data
+        batch_labels[image_index] = labels[offset + index]
+        image_index += 1
+    except IOError as e:
+      skipped_images = skipped_images + 1
+      print('Could not read:', image_file, ':', e, '- it\'s ok, skipping.')
+    index += 1
+    
+  batch_data = batch_data[0:image_index, :, :]
+  batch_labels = batch_labels[0:image_index]
+    
+  batch_data, batch_labels = reformat(batch_data, batch_labels, image_shape, num_labels, num_channels)
 
+  return batch_data, batch_labels, skipped_images
 
 
 train_classes, train_labels = load_classes('notMNIST_large')
@@ -113,3 +150,5 @@ pickle_data('notMNIST.pickle',
             train_dataset, train_labels, 
             valid_dataset, valid_labels, 
             test_dataset, test_labels)
+
+data, label, num = load_batch(valid_dataset, valid_labels, 0, len(valid_labels), (28, 28), 255, 10, 1)
