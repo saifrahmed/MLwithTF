@@ -9,6 +9,7 @@ from IPython.display import display, Image
 from scipy import ndimage
 from sklearn.linear_model import LogisticRegression
 from six.moves.urllib.request import urlretrieve
+from six.moves import cPickle as pickle
 import logging
 
 def load_classes(root):
@@ -70,6 +71,29 @@ def randomize(dataset, labels):
   shuffled_labels = labels[permutation]
   return shuffled_dataset, shuffled_labels
 
+def pickle_data(filename, 
+                train_dataset, train_labels, 
+                valid_dataset, valid_labels, 
+                test_dataset, test_labels):
+    try:
+      f = open(filename, 'wb')
+      save = {
+        'train_dataset': train_dataset,
+        'train_labels': train_labels,
+        'valid_dataset': valid_dataset,
+        'valid_labels': valid_labels,
+        'test_dataset': test_dataset,
+        'test_labels': test_labels,
+        }
+      pickle.dump(save, f, pickle.HIGHEST_PROTOCOL)
+      f.close()
+    except Exception as e:
+      print('Unable to save data to', filename, ':', e)
+      raise
+
+
+
+
 
 train_classes, train_labels = load_classes('notMNIST_large')
 test_classes, test_labels = load_classes('notMNIST_small')
@@ -84,3 +108,8 @@ _, _, test_dataset, test_labels = merge_datasets(test_classes, test_size)
 
 train_dataset, train_labels = randomize(train_dataset, train_labels)
 test_dataset, test_labels = randomize(test_dataset, test_labels)
+
+pickle_data('notMNIST.pickle',
+            train_dataset, train_labels, 
+            valid_dataset, valid_labels, 
+            test_dataset, test_labels)
