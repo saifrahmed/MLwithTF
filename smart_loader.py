@@ -17,12 +17,14 @@ def load_classes(root):
                                if os.path.isdir(os.path.join(root, directory))]))
     
     classes = np.ndarray(shape=(len(class_root_dirs),), dtype=object)
+    labels = np.ndarray(shape=(len(class_root_dirs),), dtype=object)
 
     for index, path_prefix in enumerate(class_root_dirs):
         temp_arr = np.array([os.path.join(path_prefix, filename)
                              for filename in os.listdir(path_prefix) 
                              if os.path.isfile(os.path.join(path_prefix, filename))])
 
-        classes[index] = temp_arr    
+        classes[index] = temp_arr  
+        labels[index] = np.array([index]*temp_arr.size)
     
-    return classes
+    return classes, labels
