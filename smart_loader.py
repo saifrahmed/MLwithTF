@@ -69,3 +69,18 @@ def randomize(dataset, labels):
   shuffled_dataset = dataset[permutation]
   shuffled_labels = labels[permutation]
   return shuffled_dataset, shuffled_labels
+
+
+train_classes, train_labels = load_classes('notMNIST_large')
+test_classes, test_labels = load_classes('notMNIST_small')
+
+train_size = 200000
+valid_size = 10000
+test_size = 10000
+
+valid_dataset, valid_labels, train_dataset, train_labels = merge_datasets(
+  train_classes, train_size, valid_size)
+_, _, test_dataset, test_labels = merge_datasets(test_classes, test_size)
+
+train_dataset, train_labels = randomize(train_dataset, train_labels)
+test_dataset, test_labels = randomize(test_dataset, test_labels)
