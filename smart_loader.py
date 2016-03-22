@@ -56,11 +56,13 @@ def merge_datasets(classes, train_size, valid_size=0):
         start_v += vsize_per_class
         end_v += vsize_per_class
                     
-        train_letter = class_[vsize_per_class:end_l]
-        train_dataset[start_t:end_t] = train_letter
-        train_labels[start_t:end_t] = label
-        start_t += tsize_per_class
-        end_t += tsize_per_class
+    train_letter = class_[vsize_per_class:end_l]
+    train_dataset[start_t:end_t] = train_letter
+    train_labels[start_t:end_t] = label
+    start_t += tsize_per_class
+    end_t += tsize_per_class
+    
+  return valid_dataset, valid_labels, train_dataset, train_labels
     
   return valid_dataset, valid_labels, train_dataset, train_labels
 
