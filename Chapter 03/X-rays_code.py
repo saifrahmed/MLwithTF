@@ -7,6 +7,7 @@ from logmanager import *
 np.random.seed(133)
 max_graph_size = 2 * (1024 ** 3)  # (1024 ** 3) means a GB
 
+log_location = '/tmp/mnist_logs'
 
 class Base(object):
     image_depth = -1
@@ -336,11 +337,21 @@ class CNN(Base):
                 [self.num_hidden, Base.total_training_classes], stddev=0.1))
             layer4_biases = tf.Variable(tf.constant(1.0, shape=[Base.total_training_classes]))
 
+            _ = tf.histogram_summary('layer1_weights', layer1_weights)
+            _ = tf.histogram_summary('layer1_biases', layer1_biases)
+            _ = tf.histogram_summary('layer2_weights', layer2_weights)
+            _ = tf.histogram_summary('layer2_biases', layer2_biases)
+            _ = tf.histogram_summary('layer3_weights', layer3_weights)
+            _ = tf.histogram_summary('layer3_biases', layer3_biases)
+            _ = tf.histogram_summary('layer4_weights', layer4_weights)
+            _ = tf.histogram_summary('layer4_biases', layer4_biases)
+
             # Training computation.
             self.logits = CNN.model(self.tf_train_dataset, layer1_weights, layer1_biases, layer2_weights, layer2_biases,
                                     layer3_weights, layer3_biases, layer4_weights, layer4_biases)
             self.loss = tf.reduce_mean(
                 tf.nn.softmax_cross_entropy_with_logits(self.logits, self.tf_train_labels))
+            _ = tf.scalar_summary('loss', self.loss)
 
             # Optimizer.
             self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(self.loss)
@@ -362,6 +373,10 @@ class CNN(Base):
         skipped_images = 0
 
         with tf.Session(graph=self.graph) as session:
+            # saving graph
+            merged = tf.merge_all_summaries()
+            writer = tf.train.SummaryWriter(log_location, session.graph_def)
+
             tf.initialize_all_variables().run()
             logger.info('Session Initialized')
             for step in range(self.num_steps):
@@ -376,9 +391,11 @@ class CNN(Base):
                                                                     Base.total_training_classes, self.channels)
                 skipped_images += skipped
                 feed_dict = {self.tf_train_dataset: batch_data, self.tf_train_labels: batch_labels}
-                _, l, predictions = session.run(
-                    [self.optimizer, self.loss, self.train_prediction], feed_dict=feed_dict)
+                _, sum_string, l, predictions = session.run(
+                    [self.optimizer, merged, self.loss, self.train_prediction], feed_dict=feed_dict)
                 if (step % self.data_showing_step == 0):
+                    writer.add_summary(sum_string, step)
+
                     # print('Minibatch loss at step %d: %f' % (step, l))
                     # print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
                     miniBatchAccuracy = Base.accuracy(predictions, batch_labels)
@@ -441,6 +458,7 @@ class CNN(Base):
 
             # print('Test accuracy: %.1f%%' % (100.0 * test_correct_sum / total_test_checked))
             logger.info('Test accuracy: %.1f%%' % (100.0 * test_correct_sum / total_test_checked))
+
 
 train = ['/home/shams/Desktop/notMNIST_large', 'A', 'B']
 test = ['/home/shams/Desktop/notMNIST_small', 'A', 'B']

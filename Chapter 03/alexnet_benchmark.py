@@ -36,6 +36,7 @@ import time
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
+log_locations = '/tmp/mnist_logs'
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -70,6 +71,7 @@ def inference(images):
     conv1 = tf.nn.relu(bias, name=scope)
     print_activations(conv1)
     parameters += [kernel, biases]
+    _ = tf.histogram_summary('conv1_weights', kernel)
 
   # lrn1
   # TODO(shlens, jiayq): Add a GPU version of local response normalization.
@@ -92,6 +94,8 @@ def inference(images):
     bias = tf.nn.bias_add(conv, biases)
     conv2 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
+    _ = tf.histogram_summary('conv2_weights', kernel)
+
   print_activations(conv2)
 
   # pool2
@@ -113,6 +117,7 @@ def inference(images):
     bias = tf.nn.bias_add(conv, biases)
     conv3 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
+    _ = tf.histogram_summary('conv3_weights', kernel)
     print_activations(conv3)
 
   # conv4
@@ -126,6 +131,7 @@ def inference(images):
     bias = tf.nn.bias_add(conv, biases)
     conv4 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
+    _ = tf.histogram_summary('conv4_weights', kernel)
     print_activations(conv4)
 
   # conv5
@@ -139,6 +145,7 @@ def inference(images):
     bias = tf.nn.bias_add(conv, biases)
     conv5 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
+    _ = tf.histogram_summary('conv5_weights', kernel)
     print_activations(conv5)
 
   # pool5
@@ -152,7 +159,7 @@ def inference(images):
   return pool5, parameters
 
 
-def time_tensorflow_run(session, target, info_string):
+def time_tensorflow_run(session, target, info_string, sum_writer=None, sum_merged=None):
   """Run the computation to obtain the target tensor and print timing stats.
   Args:
     session: the TensorFlow session to run the computation under.
@@ -164,14 +171,19 @@ def time_tensorflow_run(session, target, info_string):
   num_steps_burn_in = 10
   total_duration = 0.0
   total_duration_squared = 0.0
+  print('steps:', str(FLAGS.num_batches + num_steps_burn_in))
   for i in xrange(FLAGS.num_batches + num_steps_burn_in):
     start_time = time.time()
     _ = session.run(target)
     duration = time.time() - start_time
     if i > num_steps_burn_in:
-      if not i % 10:
+      if not i % 2:
         print ('%s: step %d, duration = %.3f' %
                (datetime.now(), i - num_steps_burn_in, duration))
+        if sum_writer and sum_merged:
+            result = session.run(sum_merged)
+            sum_writer.add_summary(result, i)
+
       total_duration += duration
       total_duration_squared += duration * duration
   mn = total_duration / FLAGS.num_batches
@@ -200,6 +212,7 @@ def run_benchmark():
     # inference model.
     pool5, parameters = inference(images)
 
+
     # Build an initialization operation.
     init = tf.initialize_all_variables()
 
@@ -207,6 +220,11 @@ def run_benchmark():
     config = tf.ConfigProto()
     config.gpu_options.allocator_type = 'BFC'
     sess = tf.Session(config=config)
+
+    # saving graph
+    merged = tf.merge_all_summaries()
+    writer = tf.train.SummaryWriter(log_locations, sess.graph_def)
+
     sess.run(init)
 
     # Run the forward benchmark.
@@ -217,7 +235,7 @@ def run_benchmark():
     # Compute the gradient with respect to all the parameters.
     grad = tf.gradients(objective, parameters)
     # Run the backward benchmark.
-    time_tensorflow_run(sess, grad, "Forward-backward")
+    time_tensorflow_run(sess, grad, "Forward-backward", writer, merged)
 
 
 def main(_):

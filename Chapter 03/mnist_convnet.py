@@ -49,6 +49,7 @@ EVAL_FREQUENCY = 100  # Number of steps between evaluations.
 tf.app.flags.DEFINE_boolean("self_test", False, "True if running a self test.")
 FLAGS = tf.app.flags.FLAGS
 
+log_location = '/tmp/mnist_logs'
 
 def maybe_download(filename):
   """Download the data from Yann's website, unless it's already here."""
@@ -172,6 +173,15 @@ def main(argv=None):  # pylint: disable=unused-argument
                           seed=SEED))
   fc2_biases = tf.Variable(tf.constant(0.1, shape=[NUM_LABELS]))
 
+  _ = tf.histogram_summary('conv1_weights', conv1_weights)
+  _ = tf.histogram_summary('conv1_biases', conv1_biases)
+  _ = tf.histogram_summary('conv2_weights', conv2_weights)
+  _ = tf.histogram_summary('conv2_biases', conv2_biases)
+  _ = tf.histogram_summary('fc1_weights', fc1_weights)
+  _ = tf.histogram_summary('fc1_biases', fc1_biases)
+  _ = tf.histogram_summary('fc2_weights', fc2_weights)
+  _ = tf.histogram_summary('fc2_biases', fc2_biases)
+
   # We will replicate the model structure for the training subgraph, as well
   # as the evaluation subgraphs, while sharing the trainable parameters.
   def model(data, train=False):
@@ -219,6 +229,7 @@ def main(argv=None):  # pylint: disable=unused-argument
   logits = model(train_data_node, True)
   loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
       logits, train_labels_node))
+  _ = tf.scalar_summary('loss', loss)
 
   # L2 regularization for the fully connected parameters.
   regularizers = (tf.nn.l2_loss(fc1_weights) + tf.nn.l2_loss(fc1_biases) +
@@ -236,6 +247,8 @@ def main(argv=None):  # pylint: disable=unused-argument
       train_size,          # Decay step.
       0.95,                # Decay rate.
       staircase=True)
+  _ = tf.scalar_summary('learning_rate', learning_rate)
+
   # Use simple momentum for the optimization.
   optimizer = tf.train.MomentumOptimizer(learning_rate,
                                          0.9).minimize(loss,
@@ -272,6 +285,11 @@ def main(argv=None):  # pylint: disable=unused-argument
   # Create a local session to run the training.
   start_time = time.time()
   with tf.Session() as sess:
+
+    # saving graph
+    merged = tf.merge_all_summaries()
+    writer = tf.train.SummaryWriter(log_location, sess.graph_def)
+
     # Run all the initializers to prepare the trainable parameters.
     tf.initialize_all_variables().run()
     print('Initialized!')
@@ -287,9 +305,12 @@ def main(argv=None):  # pylint: disable=unused-argument
       feed_dict = {train_data_node: batch_data,
                    train_labels_node: batch_labels}
       # Run the graph and fetch some of the nodes.
-      _, l, lr, predictions = sess.run(
-          [optimizer, loss, learning_rate, train_prediction],
+      _, sum_string, l, lr, predictions = sess.run(
+          [optimizer, merged, loss, learning_rate, train_prediction],
           feed_dict=feed_dict)
+      if step % 10 == 0:
+          writer.add_summary(sum_string, step)
+
       if step % EVAL_FREQUENCY == 0:
         elapsed_time = time.time() - start_time
         start_time = time.time()

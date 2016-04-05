@@ -4,6 +4,7 @@ import tensorflow as tf
 from six.moves import cPickle as pickle
 from six.moves import range
 
+log_location = '/tmp/mnist_logs'
 pickle_file = 'notMNIST.pickle'
 
 with open(pickle_file, 'rb') as f:
@@ -65,9 +66,17 @@ with graph.as_default():
     tf.matmul(tf_valid_dataset, weights) + biases)
   test_prediction = tf.nn.softmax(tf.matmul(tf_test_dataset, weights) + biases)
 
+  _ = tf.histogram_summary('notMNIST_weights', weights)
+  _ = tf.histogram_summary('notMNIST_biases', biases)
+  _ = tf.scalar_summary('notMNIST_loss', loss)
+
 num_steps = 3001
 
 with tf.Session(graph=graph) as session:
+  # saving graph
+  merged = tf.merge_all_summaries()
+  writer = tf.train.SummaryWriter(log_location, session.graph_def)
+
   tf.initialize_all_variables().run()
   print("Initialized")
   for step in range(num_steps):
@@ -81,8 +90,11 @@ with tf.Session(graph=graph) as session:
     # The key of the dictionary is the placeholder node of the graph to be fed,
     # and the value is the numpy array to feed to it.
     feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
-    _, l, predictions = session.run(
-      [optimizer, loss, train_prediction], feed_dict=feed_dict)
+    _, sum_string, l, predictions = session.run(
+      [optimizer, merged, loss, train_prediction], feed_dict=feed_dict)
+    if step % 10 == 0:
+        writer.add_summary(sum_string, step)
+
     if (step % 500 == 0):
       print("Minibatch loss at step %d: %f" % (step, l))
       print("Minibatch accuracy: %.1f%%" % accuracy(predictions, batch_labels))
