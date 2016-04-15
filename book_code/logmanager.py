@@ -1,7 +1,7 @@
 import logging
-logger = logging.getLogger('DeepX')
+logger = logging.getLogger('Deep_Learning')
 logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler('deepx.log')
+fh = logging.FileHandler('deep_learning.log')
 fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
