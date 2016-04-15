@@ -9,7 +9,9 @@ from book_code.logmanager import *
 batch_size = 128
 num_steps = 6001
 learning_rate = 0.3
-relu_layers = 64
+relu_layers = 1
+
+log_location = '/tmp/simple_nn_log'
 
 def reformat(data, image_size, num_of_classes):
     data.train_dataset = data.train_dataset.reshape((-1, image_size * image_size)).astype(np.float32)
@@ -29,11 +31,15 @@ def accuracy(predictions, labels):
             / predictions.shape[0])
 
 def nn_model(data, weights, biases):
-    layer_fc1 = tf.matmul(data, weights['fc1']) + biases['fc1']
+
+    with tf.name_scope('FC_layer_1') as scope:
+        layer_fc1 = tf.nn.bias_add(tf.matmul(data, weights['fc1']), biases['fc1'], name=scope)
     relu_layer = tf.nn.relu(layer_fc1)
     for relu in range(2, relu_layers + 1):
         relu_layer = tf.nn.relu(relu_layer)
-    return tf.matmul(relu_layer, weights['fc2']) + biases['fc2']
+    with tf.name_scope('FC_layer_2') as scope:
+        layer_fc2 = tf.nn.bias_add(tf.matmul(relu_layer, weights['fc2']), biases['fc2'], name=scope)
+    return layer_fc2
 
 
 not_mnist, image_size, num_of_classes = prepare_not_mnist_dataset()
@@ -48,25 +54,33 @@ with graph.as_default():
     # Input data. For the training data, we use a placeholder that will be fed
     # at run time with a training minibatch.
     tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, image_size * image_size))
-    tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes))
-    tf_valid_dataset = tf.constant(not_mnist.valid_dataset)
-    tf_test_dataset = tf.constant(not_mnist.test_dataset)
+                                      shape=(batch_size, image_size * image_size), name='TRAIN_DATASET')
+    tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
+    tf_valid_dataset = tf.constant(not_mnist.valid_dataset, name='VALID_DATASET')
+    tf_test_dataset = tf.constant(not_mnist.test_dataset, name='TEST_DATASET')
 
     # Variables.
     weights = {
-        'fc1': tf.Variable(tf.truncated_normal([image_size * image_size, num_of_classes])),
-        'fc2': tf.Variable(tf.truncated_normal([num_of_classes, num_of_classes]))
+        'fc1': tf.Variable(tf.truncated_normal([image_size * image_size, num_of_classes]), name='weights'),
+        'fc2': tf.Variable(tf.truncated_normal([num_of_classes, num_of_classes]), name='weights')
     }
     biases = {
-        'fc1': tf.Variable(tf.zeros([num_of_classes])),
-        'fc2': tf.Variable(tf.zeros([num_of_classes]))
+        'fc1': tf.Variable(tf.truncated_normal([num_of_classes], name='biases')),
+        'fc2': tf.Variable(tf.truncated_normal([num_of_classes], name='biases'))
     }
+
+    for weight_key in sorted(weights.keys()):
+        _ = tf.histogram_summary(weight_key + '_weights', weights[weight_key])
+
+    for bias_key in sorted(biases.keys()):
+        _ = tf.histogram_summary(bias_key + '_biases', biases[bias_key])
 
     # Training computation.
     logits = nn_model(tf_train_dataset, weights, biases)
     loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+
+    _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
@@ -77,6 +91,10 @@ with graph.as_default():
     test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
 
 with tf.Session(graph=graph) as session:
+    # saving graph
+    merged = tf.merge_all_summaries()
+    writer = tf.train.SummaryWriter(log_location, session.graph_def)
+
     tf.initialize_all_variables().run()
     print("Initialized")
     for step in range(num_steps):
@@ -92,8 +110,11 @@ with tf.Session(graph=graph) as session:
         # The key of the dictionary is the placeholder node of the graph to be fed,
         # and the value is the numpy array to feed to it.
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
-        _, l, predictions = session.run(
-            [optimizer, loss, train_prediction], feed_dict=feed_dict)
+        summary_result, _, l, predictions = session.run(
+            [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
+
+        writer.add_summary(summary_result, step)
+
         if (step % 500 == 0):
             logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
                 step, accuracy(predictions, batch_labels), accuracy(
