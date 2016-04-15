@@ -191,7 +191,13 @@ def pickle_whole(train_pickle_files, test_pickle_files, image_size,
             train_pickle_files, image_size, train_size, valid_size)
         print('Merging test data')
         _, _, test_dataset, test_labels = merge_datasets(test_pickle_files, image_size, test_size)
+        print('Training set', train_dataset.shape, train_labels.shape)
+        print('Validation set', valid_dataset.shape, valid_labels.shape)
+        print('Test set', test_dataset.shape, test_labels.shape)
 
+        train_dataset, train_labels = randomize(train_dataset, train_labels)
+        test_dataset, test_labels = randomize(test_dataset, test_labels)
+        valid_dataset, valid_labels = randomize(valid_dataset, valid_labels)
         try:
             f = open(output_file_path, 'wb')
             save = {
