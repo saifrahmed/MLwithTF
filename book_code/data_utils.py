@@ -66,11 +66,11 @@ def load_class(folder, image_size, pixel_depth):
     dataset = np.ndarray(shape=(num_of_images, image_size, image_size),
                          dtype=np.float32)
     image_index = 0
-    print('Started loading images from: ' + folder + '\r')
+    print('Started loading images from: ' + folder)
     for index, image in enumerate(image_files):
 
-        print('Loading image %d of %d' % (index + 1, num_of_images))
-        #sys.stdout.flush()
+        sys.stdout.write('Loading image %d of %d\r' % (index + 1, num_of_images))
+        sys.stdout.flush()
 
         image_file = os.path.join(folder, image)
 
