@@ -9,7 +9,7 @@ import math
 
 batch_size = 32
 num_steps = 6001
-learning_rate = 0.1
+learning_rate = 0.5
 num_channels = 1
 
 patch_size = 5
