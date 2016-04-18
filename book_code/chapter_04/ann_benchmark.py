@@ -7,17 +7,19 @@ from book_code.data_utils import *
 from book_code.logmanager import *
 import math
 
-batch_size = 128
-num_steps = 30001
+batch_size = 32
+num_steps = 6001
 learning_rate = 0.1
 num_channels = 1
 
 patch_size = 5
-depth_inc = 16
+depth_inc = 4
 num_hidden_inc = 32
 dropout_prob = 0.8
 
 conv_layers = 2
+SEED = 66478
+stddev = 0.1
 
 log_location = '/tmp/alex_nn_log'
 
@@ -93,13 +95,17 @@ with graph.as_default():
 
     # Variables.
     weights = {
-        'conv1': tf.Variable(tf.truncated_normal([patch_size, patch_size, num_channels, depth_inc]), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc]), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc]), name='weights'),
+        'conv1': tf.Variable(tf.truncated_normal([patch_size, patch_size, num_channels, depth_inc],
+                                                 stddev=stddev, seed=SEED), name='weights'),
+        'conv2': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc],
+                                                 stddev=stddev, seed=SEED), name='weights'),
+        'conv3': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc],
+                                                 stddev=stddev, seed=SEED), name='weights'),
         'fc1': tf.Variable(
             tf.truncated_normal([(fc_first_layer_dimen(image_size, conv_layers) ** 2) * depth_inc,
-                                 num_hidden_inc]), name='weights'),
-        'fc2': tf.Variable(tf.truncated_normal([num_hidden_inc, num_of_classes]), name='weights')
+                                 num_hidden_inc], stddev=stddev, seed=SEED), name='weights'),
+        'fc2': tf.Variable(tf.truncated_normal([num_hidden_inc, num_of_classes],
+                                               stddev=stddev, seed=SEED), name='weights')
     }
     biases = {
         'conv1': tf.Variable(tf.zeros([depth_inc]), name='biases'),
@@ -119,12 +125,6 @@ with graph.as_default():
     logits = nn_model(tf_train_dataset, weights, biases, True)
     loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
-
-    # L2 regularization for the fully connected parameters.
-    regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
-                    tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
-    # Add the regularization term to the loss.
-    loss += 10e-4 * regularizers
 
     _ = tf.scalar_summary('nn_loss', loss)
 
