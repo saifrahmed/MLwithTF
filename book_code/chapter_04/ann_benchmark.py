@@ -7,14 +7,14 @@ from book_code.data_utils import *
 from book_code.logmanager import *
 import math
 
-batch_size = 128
+batch_size = 32
 num_steps = 6001
-learning_rate = 0.3
+learning_rate = 0.1
 num_channels = 1
 
 patch_size = 5
-depth_inc = 8
-num_hidden_inc = 128
+depth_inc = 4
+num_hidden_inc = 32
 dropout_prob = 0.8
 
 log_location = '/tmp/alex_nn_log'
@@ -49,16 +49,12 @@ def nn_model(data, weights, biases, TRAIN=False):
         bias_add = tf.nn.bias_add(conv, biases['conv1'], name='bias_add_1')
         relu = tf.nn.relu(bias_add, name='relu_1')
         max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
-        if TRAIN:
-            max_pool = tf.nn.dropout(max_pool, dropout_prob, name='dropout_1')
 
     with tf.name_scope('Layer_2') as scope:
         conv = tf.nn.conv2d(max_pool, weights['conv2'], strides=[1, 1, 1, 1], padding='SAME', name='conv2')
         bias_add = tf.nn.bias_add(conv, biases['conv2'], name='bias_add_2')
         relu = tf.nn.relu(bias_add, name='relu_2')
         max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
-        if TRAIN:
-            max_pool = tf.nn.dropout(max_pool, dropout_prob, name='dropout_2')
 
     with tf.name_scope('Layer_3') as scope:
         conv = tf.nn.conv2d(max_pool, weights['conv3'], strides=[1, 1, 1, 1], padding='SAME', name='conv3')
@@ -66,7 +62,7 @@ def nn_model(data, weights, biases, TRAIN=False):
         relu = tf.nn.relu(bias_add, name='relu_3')
         max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
         if TRAIN:
-            max_pool = tf.nn.dropout(max_pool, dropout_prob, name='dropout_3')
+            max_pool = tf.nn.dropout(max_pool, dropout_prob, name='dropout_1')
 
     shape = max_pool.get_shape().as_list()
     reshape = tf.reshape(max_pool, [shape[0], shape[1] * shape[2] * shape[3]])
@@ -75,8 +71,6 @@ def nn_model(data, weights, biases, TRAIN=False):
         matmul = tf.matmul(reshape, weights['fc1'], name='fc1_matmul')
         bias_add = tf.nn.bias_add(matmul, biases['fc1'], name='fc1_bias_add')
         relu = tf.nn.relu(bias_add, name=scope)
-        if TRAIN:
-            relu = tf.nn.dropout(relu, dropout_prob, name='fc1_dropout')
 
     with tf.name_scope('FC_Layer_2') as scope:
         matmul = tf.matmul(relu, weights['fc2'], name='fc2_matmul')
@@ -132,6 +126,12 @@ with graph.as_default():
     loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
+    # L2 regularization for the fully connected parameters.
+    regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
+                    tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
+    # Add the regularization term to the loss.
+    loss += 5e-4 * regularizers
+
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
@@ -162,10 +162,10 @@ with tf.Session(graph=graph) as session:
         # The key of the dictionary is the placeholder node of the graph to be fed,
         # and the value is the numpy array to feed to it.
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
-        summary_result, _, l, predictions = session.run(
-            [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
+        _, l, predictions = session.run(
+            [ optimizer, loss, train_prediction], feed_dict=feed_dict)
 
-        writer.add_summary(summary_result, step)
+        #writer.add_summary(summary_result, step)
 
         if (step % 500 == 0):
             logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
