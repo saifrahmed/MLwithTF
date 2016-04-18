@@ -8,7 +8,7 @@ from book_code.logmanager import *
 import math
 
 batch_size = 32
-num_steps = 6001
+num_steps = 30001
 learning_rate = 0.1
 num_channels = 1
 
@@ -20,6 +20,8 @@ dropout_prob = 0.8
 conv_layers = 3
 SEED = 66478
 stddev = 0.1
+
+data_showing_step = 500
 
 log_location = '/tmp/alex_nn_log'
 
@@ -169,12 +171,12 @@ with tf.Session(graph=graph) as session:
         # The key of the dictionary is the placeholder node of the graph to be fed,
         # and the value is the numpy array to feed to it.
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
-        _, l, predictions = session.run(
-            [ optimizer, loss, train_prediction], feed_dict=feed_dict)
+        summary_result, _, l, predictions = session.run(
+            [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
 
-        #writer.add_summary(summary_result, step)
+        writer.add_summary(summary_result, step)
 
-        if (step % 500 == 0):
+        if (step % data_showing_step == 0):
             logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
                 step, accuracy(predictions, batch_labels), accuracy(
                 valid_prediction.eval(), not_mnist.valid_labels), l))
