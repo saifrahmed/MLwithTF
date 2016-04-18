@@ -220,11 +220,102 @@ def pickle_whole(train_pickle_files, test_pickle_files, image_size,
         return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
 
 
+def load_cifar_10_pickle(pickle_file, image_depth):
+    fo = open(pickle_file, 'rb')
+    dict = pickle.load(fo)
+    fo.close()
+    return ((dict['data'].astype(float) - image_depth / 2) / (image_depth)), dict['labels']
+
+
+def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_batch_size, image_size, image_depth,
+                               num_of_channels):
+    all_train_data = np.ndarray(shape=(pickle_batch_size * len(train_pickle_files),
+                                       image_size * image_size * num_of_channels),
+                                dtype=np.float32)
+
+    all_train_labels = np.ndarray(shape=pickle_batch_size * len(train_pickle_files), dtype=object)
+
+    all_test_data = np.ndarray(shape=(pickle_batch_size * len(test_pickle_files),
+                                      image_size * image_size * num_of_channels),
+                               dtype=np.float32)
+    all_test_labels = np.ndarray(shape=pickle_batch_size * len(test_pickle_files), dtype=object)
+
+    print('Started loading training data')
+    for index, train_pickle_file in enumerate(train_pickle_files):
+        all_train_data[index * pickle_batch_size: (index + 1) * pickle_batch_size, :], \
+        all_train_labels[index * pickle_batch_size: (index + 1) * pickle_batch_size] = \
+            load_cifar_10_pickle(train_pickle_file, image_depth)
+    print('Finished loading training data\n')
+
+    print('Started loading testing data')
+    for index, test_pickle_file in enumerate(test_pickle_files):
+        all_test_data[index * pickle_batch_size: (index + 1) * pickle_batch_size, :], \
+        all_test_labels[index * pickle_batch_size: (index + 1) * pickle_batch_size] = \
+            load_cifar_10_pickle(test_pickle_file, image_depth)
+    print('Finished loading testing data')
+
+    return all_train_data, all_train_labels, all_test_data, all_test_labels
+
+
+def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
+                     train_size, valid_size, test_size, output_file_path, FORCE=False):
+
+    if os.path.isfile(output_file_path) and not FORCE:
+        print('Pickle file: %s already exist' % output_file_path)
+
+        with open(output_file_path, 'rb') as f:
+            save = pickle.load(f)
+            train_dataset = save['train_dataset']
+            train_labels = save['train_labels']
+            valid_dataset = save['valid_dataset']
+            valid_labels = save['valid_labels']
+            test_dataset = save['test_dataset']
+            test_labels = save['test_labels']
+            del save  # hint to help gc free up memory
+            print('Training set', train_dataset.shape, train_labels.shape)
+            print('Validation set', valid_dataset.shape, valid_labels.shape)
+            print('Test set', test_dataset.shape, test_labels.shape)
+
+        return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
+    else:
+        train_dataset = all_train_data[0:train_size]
+        train_labels = all_train_labels[0:train_size]
+        valid_dataset = all_train_data[train_size:train_size + valid_size]
+        valid_labels = all_train_labels[train_size:train_size + valid_size]
+        test_dataset = all_test_data[0:test_size]
+        test_labels = all_test_labels[0:test_size]
+
+        try:
+            f = open(output_file_path, 'wb')
+            save = {
+                'train_dataset': train_dataset,
+                'train_labels': train_labels,
+                'valid_dataset': valid_dataset,
+                'valid_labels': valid_labels,
+                'test_dataset': test_dataset,
+                'test_labels': test_labels,
+            }
+            pickle.dump(save, f, pickle.HIGHEST_PROTOCOL)
+            f.close()
+        except Exception as e:
+            print('Unable to save data to', output_file_path, ':', e)
+            raise
+
+        statinfo = os.stat(output_file_path)
+        print('Compressed pickle size:', statinfo.st_size)
+
+    return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
+
+
 def prepare_not_mnist_dataset():
     print('Started preparing notMNIST dataset')
 
     image_size = 28
     image_depth = 255
+
+    training_set_url = 'http://yaroslavvb.com/upload/notMNIST/notMNIST_large.tar.gz'
+    test_set_url = 'http://yaroslavvb.com/upload/notMNIST/notMNIST_small.tar.gz'
+
     train_download_size = 247336696
     test_download_size = 8458043
 
@@ -233,10 +324,11 @@ def prepare_not_mnist_dataset():
     test_size = 10000
 
     num_of_classes = 10
+    num_of_channels = 1
 
-    train_file_path = download_file('http://yaroslavvb.com/upload/notMNIST/notMNIST_large.tar.gz',
+    train_file_path = download_file(training_set_url,
                             os.path.realpath('../../datasets/notMNIST'), train_download_size)
-    test_file_path = download_file('http://yaroslavvb.com/upload/notMNIST/notMNIST_small.tar.gz',
+    test_file_path = download_file(test_set_url,
                             os.path.realpath('../../datasets/notMNIST'), test_download_size)
 
     train_extracted_folder = extract_file(train_file_path, os.path.realpath('../../datasets/notMNIST/train'))
@@ -269,5 +361,66 @@ def prepare_not_mnist_dataset():
     not_mnist.test_dataset = test_dataset
     not_mnist.test_labels = test_labels
 
-    return not_mnist, image_size, num_of_classes
+    return not_mnist, image_size, num_of_classes, num_of_channels
 
+
+def prepare_cifar_10_dataset():
+    print('Started preparing CIFAR-10 dataset')
+
+    image_size = 32
+    image_depth = 255
+
+    cifar_dataset_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+
+    dataset_size = 170498071
+
+    train_size = 45000
+    valid_size = 5000
+    test_size = 10000
+
+    num_of_classes = 10
+    num_of_channels = 3
+
+    pickle_batch_size = 10000
+
+    dataset_path = download_file(cifar_dataset_url,
+                            os.path.realpath('../../datasets/CIFAR-10'), dataset_size)
+
+    dataset_extracted_folder = extract_file(dataset_path, os.path.realpath('../../datasets/CIFAR-10/data'))
+
+    train_pickle_files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4',
+                                                     'data_batch_5']
+    train_pickle_files = [dataset_extracted_folder + '/' + x for x in train_pickle_files]
+
+    test_pickle_files = ['test_batch']
+    test_pickle_files = [dataset_extracted_folder + '/' + x for x in test_pickle_files]
+
+    print('Started loading CIFAR-10 dataset')
+    all_train_data, all_train_labels, all_test_data, all_test_labels = load_cifar_10_from_pickles(train_pickle_files,
+                                                                                                  test_pickle_files,
+                                                                                                  pickle_batch_size,
+                                                                                                  image_size,
+                                                                                                  image_depth,
+                                                                                                  num_of_channels)
+    print('Finished loading CIFAR-10 dataset')
+
+
+    print('Started pickling final dataset')
+    train_dataset, train_labels, valid_dataset, valid_labels, \
+    test_dataset, test_labels = pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
+                                                train_size, valid_size, test_size,
+                                                os.path.realpath('../../datasets/CIFAR-10/CIFAR-10.pickle'), True)
+    print('Finished pickling final dataset')
+
+    print('Finished preparing CIFAR-10 dataset')
+
+    def cifar_10(): pass
+
+    cifar_10.train_dataset = train_dataset
+    cifar_10.train_labels = train_labels
+    cifar_10.valid_dataset = valid_dataset
+    cifar_10.valid_labels = valid_labels
+    cifar_10.test_dataset = test_dataset
+    cifar_10.test_labels = test_labels
+
+    return cifar_10, image_size, num_of_classes, num_of_channels

@@ -10,7 +10,6 @@ import math
 batch_size = 32
 num_steps = 30001
 learning_rate = 0.1
-num_channels = 1
 
 patch_size = 5
 depth_inc = 4
@@ -85,12 +84,12 @@ def nn_model(data, weights, biases, TRAIN=False):
     return layer_fc2
 
 
-not_mnist, image_size, num_of_classes = prepare_not_mnist_dataset()
-not_mnist = reformat(not_mnist, image_size, num_channels, num_of_classes)
+dataset, image_size, num_of_classes, num_channels = prepare_cifar_10_dataset()
+dataset = reformat(dataset, image_size, num_channels, num_of_classes)
 
-print('Training set', not_mnist.train_dataset.shape, not_mnist.train_labels.shape)
-print('Validation set', not_mnist.valid_dataset.shape, not_mnist.valid_labels.shape)
-print('Test set', not_mnist.test_dataset.shape, not_mnist.test_labels.shape)
+print('Training set', dataset.train_dataset.shape, dataset.train_labels.shape)
+print('Validation set', dataset.valid_dataset.shape, dataset.valid_labels.shape)
+print('Test set', dataset.test_dataset.shape, dataset.test_labels.shape)
 
 graph = tf.Graph()
 with graph.as_default():
@@ -99,8 +98,8 @@ with graph.as_default():
     tf_train_dataset = tf.placeholder(tf.float32,
                                       shape=(batch_size, image_size, image_size, num_channels), name='TRAIN_DATASET')
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
-    tf_valid_dataset = tf.constant(not_mnist.valid_dataset, name='VALID_DATASET')
-    tf_test_dataset = tf.constant(not_mnist.test_dataset, name='TEST_DATASET')
+    tf_valid_dataset = tf.constant(dataset.valid_dataset, name='VALID_DATASET')
+    tf_test_dataset = tf.constant(dataset.test_dataset, name='TEST_DATASET')
 
     # Variables.
     weights = {
@@ -163,10 +162,10 @@ with tf.Session(graph=graph) as session:
         sys.stdout.flush()
         # Pick an offset within the training data, which has been randomized.
         # Note: we could use better randomization across epochs.
-        offset = (step * batch_size) % (not_mnist.train_labels.shape[0] - batch_size)
+        offset = (step * batch_size) % (dataset.train_labels.shape[0] - batch_size)
         # Generate a minibatch.
-        batch_data = not_mnist.train_dataset[offset:(offset + batch_size), :]
-        batch_labels = not_mnist.train_labels[offset:(offset + batch_size), :]
+        batch_data = dataset.train_dataset[offset:(offset + batch_size), :]
+        batch_labels = dataset.train_labels[offset:(offset + batch_size), :]
         # Prepare a dictionary telling the session where to feed the minibatch.
         # The key of the dictionary is the placeholder node of the graph to be fed,
         # and the value is the numpy array to feed to it.
@@ -179,5 +178,5 @@ with tf.Session(graph=graph) as session:
         if (step % data_showing_step == 0):
             logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
                 step, accuracy(predictions, batch_labels), accuracy(
-                valid_prediction.eval(), not_mnist.valid_labels), l))
-    print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), not_mnist.test_labels))
+                valid_prediction.eval(), dataset.valid_labels), l))
+    print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), dataset.test_labels))
