@@ -126,12 +126,6 @@ with graph.as_default():
     loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
-    # L2 regularization for the fully connected parameters.
-    regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
-                    tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
-    # Add the regularization term to the loss.
-    loss += 10e-4 * regularizers
-
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
