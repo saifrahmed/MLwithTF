@@ -8,7 +8,7 @@ from book_code.logmanager import *
 import math
 
 batch_size = 32
-num_steps = 6001
+num_steps = 30001
 learning_rate = 0.1
 num_channels = 1
 
