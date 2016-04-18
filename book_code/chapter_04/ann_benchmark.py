@@ -7,13 +7,13 @@ from book_code.data_utils import *
 from book_code.logmanager import *
 import math
 
-batch_size = 32
+batch_size = 128
 num_steps = 30001
 learning_rate = 0.1
 num_channels = 1
 
 patch_size = 5
-depth_inc = 4
+depth_inc = 16
 num_hidden_inc = 32
 dropout_prob = 0.8
 
