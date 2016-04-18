@@ -17,7 +17,7 @@ depth_inc = 4
 num_hidden_inc = 32
 dropout_prob = 0.8
 
-conv_layers = 2
+conv_layers = 3
 SEED = 66478
 stddev = 0.1
 
@@ -60,6 +60,13 @@ def nn_model(data, weights, biases, TRAIN=False):
         relu = tf.nn.relu(bias_add, name='relu_2')
         max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
 
+    with tf.name_scope('Layer_3') as scope:
+        conv = tf.nn.conv2d(max_pool, weights['conv3'], strides=[1, 1, 1, 1], padding='SAME', name='conv3')
+        bias_add = tf.nn.bias_add(conv, biases['conv3'], name='bias_add_3')
+        relu = tf.nn.relu(bias_add, name='relu_3')
+        max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
+        if TRAIN:
+            max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
 
     shape = max_pool.get_shape().as_list()
     reshape = tf.reshape(max_pool, [shape[0], shape[1] * shape[2] * shape[3]])
@@ -125,6 +132,12 @@ with graph.as_default():
     logits = nn_model(tf_train_dataset, weights, biases, True)
     loss = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+
+    # L2 regularization for the fully connected parameters.
+    regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
+                    tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
+    # Add the regularization term to the loss.
+    loss += 5e-4 * regularizers
 
     _ = tf.scalar_summary('nn_loss', loss)
 
