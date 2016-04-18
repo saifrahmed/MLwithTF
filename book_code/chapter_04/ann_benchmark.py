@@ -8,7 +8,7 @@ from book_code.logmanager import *
 import math
 
 batch_size = 32
-num_steps = 30001
+num_steps = 6001
 learning_rate = 0.1
 num_channels = 1
 
@@ -100,17 +100,17 @@ with graph.as_default():
     # Variables.
     weights = {
         'conv1': tf.Variable(tf.truncated_normal([patch_size, patch_size, num_channels, depth_inc]), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc*2]), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc*2, depth_inc*4]), name='weights'),
+        'conv2': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc]), name='weights'),
+        'conv3': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc]), name='weights'),
         'fc1': tf.Variable(
-            tf.truncated_normal([(fc_first_layer_dimen(image_size, 3) ** 2) * depth_inc * 4,
+            tf.truncated_normal([(fc_first_layer_dimen(image_size, 3) ** 2) * depth_inc,
                                  num_hidden_inc]), name='weights'),
         'fc2': tf.Variable(tf.truncated_normal([num_hidden_inc, num_of_classes]), name='weights')
     }
     biases = {
         'conv1': tf.Variable(tf.zeros([depth_inc]), name='biases'),
-        'conv2': tf.Variable(tf.zeros([depth_inc*2]), name='biases'),
-        'conv3': tf.Variable(tf.zeros([depth_inc*4]), name='biases'),
+        'conv2': tf.Variable(tf.zeros([depth_inc]), name='biases'),
+        'conv3': tf.Variable(tf.zeros([depth_inc]), name='biases'),
         'fc1': tf.Variable(tf.zeros([num_hidden_inc], name='biases')),
         'fc2': tf.Variable(tf.zeros([num_of_classes], name='biases'))
     }
@@ -130,7 +130,7 @@ with graph.as_default():
     regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
                     tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
     # Add the regularization term to the loss.
-    loss += 5e-4 * regularizers
+    loss += 10e-4 * regularizers
 
     _ = tf.scalar_summary('nn_loss', loss)
 
