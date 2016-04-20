@@ -1,2 +1,12 @@
+*.log
+*.pyc
+datasets/*
+*.png
+*.ckpt
+*.meta
+*.tar
+*.gz
+*.jpg
+*.jpeg
 2016*
 *.pickle

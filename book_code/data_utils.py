@@ -369,18 +369,13 @@ def prepare_cifar_10_dataset():
 
     image_size = 32
     image_depth = 255
-
     cifar_dataset_url = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
-
     dataset_size = 170498071
-
     train_size = 45000
     valid_size = 5000
     test_size = 10000
-
     num_of_classes = 10
     num_of_channels = 3
-
     pickle_batch_size = 10000
 
     dataset_path = download_file(cifar_dataset_url,
