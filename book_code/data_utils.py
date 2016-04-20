@@ -95,16 +95,16 @@ def make_pickles(input_folder, output_dir, image_size, image_depth, FORCE=False)
     for index, pickle_file in enumerate(pickle_files):
 
         if os.path.isfile(pickle_file) and not FORCE:
-            print('Pickle: %s already exsist' % (pickle_file))
+            print('\tPickle already exsists: %s' % (pickle_file))
         else:
             folder_path = os.path.join(input_folder, directories[index])
-            print('Loading from folder: ' + folder_path)
+            print('\tLoading from folder: ' + folder_path)
             data = load_class(folder_path, image_size, image_depth)
 
             if not os.path.isdir(output_dir):
                 os.makedirs(output_dir)
 
-            print('Started pickling: ' + directories[index])
+            print('\tStarted pickling: ' + directories[index])
             try:
                 with open(pickle_file, 'wb') as f:
                     pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
@@ -261,7 +261,7 @@ def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_la
                      train_size, valid_size, test_size, output_file_path, FORCE=False):
 
     if os.path.isfile(output_file_path) and not FORCE:
-        print('Pickle file: %s already exist' % output_file_path)
+        print('\tPickle file already exists: %s' % output_file_path)
 
         with open(output_file_path, 'rb') as f:
             save = pickle.load(f)

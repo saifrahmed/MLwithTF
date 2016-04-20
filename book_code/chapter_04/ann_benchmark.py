@@ -200,6 +200,15 @@ if (modelRestoreFile is not None):
         print "Restore Session from " + modelRestoreFile
         saver.restore(session, modelRestoreFile)
         print("Model restored from " + modelRestoreFile)
+
+        print test_prediction
+        print test_prediction.eval().shape
+        print dataset.test_labels.shape
+
+        for i,smx in enumerate(test_prediction.eval()):
+            actual=dataset.test_labels[i].argmax(axis=0)
+            predicted=smx.argmax(axis=0)
+            print i, "Actual", actual, "Prediction", predicted, "Correct" if actual==predicted else "Incorrect"
         print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), dataset.test_labels))
 
 else:
@@ -226,6 +235,7 @@ else:
             # The key of the dictionary is the placeholder node of the graph to be fed,
             # and the value is the numpy array to feed to it.
             feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
+            #print feed_dict
             summary_result, _, l, predictions = session.run(
                 [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
 
