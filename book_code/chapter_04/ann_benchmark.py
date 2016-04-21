@@ -42,6 +42,7 @@ def accuracy(predictions, labels):
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
             / predictions.shape[0])
 
+
 #For same padding the output width or height = ceil(width or height / stride) respectively
 def fc_first_layer_dimen(image_size, layers):
     output = image_size
@@ -49,8 +50,8 @@ def fc_first_layer_dimen(image_size, layers):
         output = math.ceil(output/2.0)
     return int(output)
 
-def nn_model(data, weights, biases, TRAIN=False):
 
+def nn_model(data, weights, biases, TRAIN=False):
     with tf.name_scope('Layer_1') as scope:
         conv = tf.nn.conv2d(data, weights['conv1'], strides=[1, 1, 1, 1], padding='SAME', name='conv1')
         bias_add = tf.nn.bias_add(conv, biases['conv1'], name='bias_add_1')
@@ -116,6 +117,8 @@ with graph.as_default():
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
     tf_valid_dataset = tf.constant(dataset.valid_dataset, name='VALID_DATASET')
     tf_test_dataset = tf.constant(dataset.test_dataset, name='TEST_DATASET')
+    tf_random_dataset = tf.placeholder(tf.float32, shape=(1, image_size, image_size, num_channels),
+                                               name='RANDOM_DATA')
 
     print ("Image Size", image_size)
     print ("Conv Layers", conv_layers)
@@ -169,10 +172,12 @@ with graph.as_default():
     train_prediction = tf.nn.softmax(logits)
     valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases))
     test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
+    random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases))
 
-modelRestoreFile = None
-modelSaveFile = None
-evaluateFile = None
+modelRestoreFile = os.path.realpath('../notMNIST_ann')
+modelSaveFile = os.path.realpath('../notMNIST_ann')
+evaluateFile = '/home/shams/Desktop/test_images_2/MDEtMDEtMDAudHRm.png'
+
 try:
     opts, args = getopt.getopt(sys.argv[1:],"ur:s:e:",["modelRestoreFile=","modelSaveFile=","evaluateFile="])
 except getopt.GetoptError:
@@ -254,3 +259,25 @@ else:
 
 if (evaluateFile is not None):
     print "We wish to evaluate the file " + evaluateFile
+
+    if (modelRestoreFile is not None):
+        with tf.Session(graph=graph) as session:
+            tf.initialize_all_variables().run()
+            saver = tf.train.Saver()
+            print "Restore Session from " + modelRestoreFile
+            saver.restore(session, modelRestoreFile)
+            print("Model restored from " + modelRestoreFile)
+
+            image = (ndimage.imread(evaluateFile).astype(float) -
+                          255 / 2) / 255
+            image = image.reshape((image_size, image_size, num_channels)).astype(np.float32)
+            random_data = np.ndarray((1, image_size, image_size, num_channels), dtype=np.float32)
+            random_data[0, :, :, :] = image
+
+            feed_dict = {tf_random_dataset: random_data}
+            output = session.run(
+                [random_prediction], feed_dict=feed_dict)
+
+            for i, smx in enumerate(output):
+                prediction = smx[0].argmax(axis=0)
+                print 'The prediction is: %d' % (prediction)
