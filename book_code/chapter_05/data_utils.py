@@ -247,8 +247,8 @@ def prepare_wmt_dataset(tokenizer=None):
     train_sub_gzip_files = ['giga-fren.release2.fr.gz', 'giga-fren.release2.en.gz']
     train_sub_gzip_files = [train_extracted_folder + '/' + x for x in train_sub_gzip_files]
 
-    if not os.path.existstrain_extracted_folder + '/data'):
-        os.makedirstrain_extracted_folder + '/data')
+    if not os.path.exists(train_extracted_folder + '/data'):
+        os.makedirs(train_extracted_folder + '/data')
 
     train_sub_extracted_files = [None] * 2
     for index, train_sub_gzip_file in enumerate(train_sub_gzip_files):
