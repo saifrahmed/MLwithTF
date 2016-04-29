@@ -25,7 +25,7 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-from book_code.chapter_05 import data_utils
+from book_code.chapter_05_update import data_utils
 
 
 class Seq2SeqModel(object):
