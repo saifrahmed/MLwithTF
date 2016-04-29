@@ -41,8 +41,8 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-from book_code.chapter_05_update import data_utils
-from book_code.chapter_05_update import seq2seq_model
+from book_code.chapter_05 import data_utils
+from book_code.chapter_05 import seq2seq_model
 
 
 tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
