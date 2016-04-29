@@ -287,4 +287,6 @@ def prepare_wmt_dataset(tokenizer=None):
     wmt.en_vocab_path = vocab_paths[1]
     wmt.fr_vocab_path = vocab_paths[0]
 
+    return wmt
+
 prepare_wmt_dataset()
