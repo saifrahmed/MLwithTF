@@ -10,3 +10,5 @@ datasets/*
 *.jpeg
 2016*
 *.pickle
+*.idea
+.idea/*
