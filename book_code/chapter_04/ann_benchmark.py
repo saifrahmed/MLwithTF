@@ -5,12 +5,13 @@ from book_code.data_utils import *
 from book_code.logmanager import *
 import math
 import getopt
+from scipy.misc import imresize
 
 logger.propagate = False
 
 batch_size = 32
 num_steps = 3001
-learning_rate = 0.01
+learning_rate = 0.1
 
 patch_size = 5
 depth_inc = 4
@@ -53,10 +54,11 @@ def fc_first_layer_dimen(image_size, layers):
 
 def nn_model(data, weights, biases, TRAIN=False):
     with tf.name_scope('Layer_1') as scope:
-        conv = tf.nn.conv2d(data, weights['conv1'], strides=[1, 1, 1, 1], padding='SAME', name='conv1')
+        conv = tf.nn.conv2d(data, weights['conv1'], strides=[1, 4, 4, 1], padding='SAME', name='conv1')
         bias_add = tf.nn.bias_add(conv, biases['conv1'], name='bias_add_1')
         relu = tf.nn.relu(bias_add, name='relu_1')
-        max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
+        max_pool = tf.nn.max_pool(relu, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name='max_pool1')
+        max_pool = tf.nn.lrn(max_pool, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name=scope)
 
     print "Layer 1 CONV", conv.get_shape()
     #print "Layer 1 RELU", relu.get_shape()
@@ -65,7 +67,8 @@ def nn_model(data, weights, biases, TRAIN=False):
         conv = tf.nn.conv2d(max_pool, weights['conv2'], strides=[1, 1, 1, 1], padding='SAME', name='conv2')
         bias_add = tf.nn.bias_add(conv, biases['conv2'], name='bias_add_2')
         relu = tf.nn.relu(bias_add, name='relu_2')
-        max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
+        max_pool = tf.nn.max_pool(relu, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name='max_pool2')
+        max_pool = tf.nn.lrn(max_pool, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name=scope)
 
     print "Layer 2 CONV", conv.get_shape()
     #print "Layer 2 RELU", relu.get_shape()
@@ -73,32 +76,61 @@ def nn_model(data, weights, biases, TRAIN=False):
     with tf.name_scope('Layer_3') as scope:
         conv = tf.nn.conv2d(max_pool, weights['conv3'], strides=[1, 1, 1, 1], padding='SAME', name='conv3')
         bias_add = tf.nn.bias_add(conv, biases['conv3'], name='bias_add_3')
-        relu = tf.nn.relu(bias_add, name='relu_3')
-        max_pool = tf.nn.max_pool(relu, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=scope)
-        if TRAIN:
-            max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
+        max_pool = tf.nn.relu(bias_add, name='relu_3')
+        #max_pool = tf.nn.max_pool(max_pool, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='', name=scope)
+        #if TRAIN:
+        #    max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
+
     print "Layer 3 CONV", conv.get_shape()
     #print "Layer 3 RELU", relu.get_shape()
     #print "Layer 3 POOL", max_pool.get_shape()
 
+    with tf.name_scope('Layer_4') as scope:
+        conv = tf.nn.conv2d(max_pool, weights['conv4'], strides=[1, 1, 1, 1], padding='SAME', name='conv4')
+        bias_add = tf.nn.bias_add(conv, biases['conv4'], name='bias_add_4')
+        max_pool = tf.nn.relu(bias_add, name='relu_4')
+        # max_pool = tf.nn.max_pool(max_pool, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='', name=scope)
+        # if TRAIN:
+        #    max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
+
+    print "Layer 4 CONV", conv.get_shape()
+    # print "Layer 3 RELU", relu.get_shape()
+    # print "Layer 3 POOL", max_pool.get_shape()
+
+    with tf.name_scope('Layer_5') as scope:
+        conv = tf.nn.conv2d(max_pool, weights['conv5'], strides=[1, 1, 1, 1], padding='SAME', name='conv5')
+        bias_add = tf.nn.bias_add(conv, biases['conv5'], name='bias_add_5')
+        max_pool = tf.nn.relu(bias_add, name='relu_5')
+        max_pool = tf.nn.max_pool(max_pool, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name=scope)
+        # if TRAIN:
+        #    max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
+
+    print "Layer 5 CONV", conv.get_shape()
+    # print "Layer 3 RELU", relu.get_shape()
+    # print "Layer 3 POOL", max_pool.get_shape()
 
     shape = max_pool.get_shape().as_list()
     reshape = tf.reshape(max_pool, [shape[0], shape[1] * shape[2] * shape[3]])
 
-    with tf.name_scope('FC_Layer_1') as scope:
-        matmul = tf.matmul(reshape, weights['fc1'], name='fc1_matmul')
-        bias_add = tf.nn.bias_add(matmul, biases['fc1'], name='fc1_bias_add')
+    with tf.name_scope('FC_Layer_6') as scope:
+        matmul = tf.matmul(reshape, weights['fc6'], name='fc6_matmul')
+        bias_add = tf.nn.bias_add(matmul, biases['fc6'], name='fc6_bias_add')
         relu = tf.nn.relu(bias_add, name=scope)
 
-    with tf.name_scope('FC_Layer_2') as scope:
-        matmul = tf.matmul(relu, weights['fc2'], name='fc2_matmul')
-        layer_fc2 = tf.nn.bias_add(matmul, biases['fc2'], name=scope)
+    with tf.name_scope('FC_Layer_7') as scope:
+        matmul = tf.matmul(relu, weights['fc7'], name='fc7_matmul')
+        bias_add = tf.nn.bias_add(matmul, biases['fc7'], name='fc7_bias_add')
+        relu = tf.nn.relu(bias_add, name=scope)
 
-    return layer_fc2
+    with tf.name_scope('FC_Layer_8') as scope:
+        matmul = tf.matmul(relu, weights['fc8'], name='fc8_matmul')
+        layer_fc8 = tf.nn.bias_add(matmul, biases['fc8'], name=scope)
+
+    return layer_fc8
 
 
-#dataset, image_size, num_of_classes, num_channels = prepare_cifar_10_dataset()
-dataset, image_size, num_of_classes, num_channels = prepare_not_mnist_dataset()
+dataset, image_size, num_of_classes, num_channels = prepare_cifar_10_dataset()
+#dataset, image_size, num_of_classes, num_channels = prepare_not_mnist_dataset()
 print "Image Size: ", image_size
 print "Number of Classes: ", num_of_classes
 print "Number of Channels", num_channels
@@ -108,12 +140,15 @@ print('Training set', dataset.train_dataset.shape, dataset.train_labels.shape)
 print('Validation set', dataset.valid_dataset.shape, dataset.valid_labels.shape)
 print('Test set', dataset.test_dataset.shape, dataset.test_labels.shape)
 
+#new_valid = (np.array([imresize(x, (227, 227, 3)).astype(float) for x in dataset.valid_dataset]) - 255 / 2) / 255
+#print(new_valid)
+
 graph = tf.Graph()
 with graph.as_default():
     # Input data. For the training data, we use a placeholder that will be fed
     # at run time with a training minibatch.
     tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, image_size, image_size, num_channels), name='TRAIN_DATASET')
+                                      shape=(batch_size, 227, 227, num_channels), name='TRAIN_DATASET')
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
     tf_valid_dataset = tf.constant(dataset.valid_dataset, name='VALID_DATASET')
     tf_test_dataset = tf.constant(dataset.test_dataset, name='TEST_DATASET')
@@ -126,24 +161,32 @@ with graph.as_default():
 
     # Variables.
     weights = {
-        'conv1': tf.Variable(tf.truncated_normal([patch_size, patch_size, num_channels, depth_inc],
+        'conv1': tf.Variable(tf.truncated_normal([11, 11, 3, 96],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc],
+        'conv2': tf.Variable(tf.truncated_normal([5, 5, 96, 256],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([patch_size, patch_size, depth_inc, depth_inc],
+        'conv3': tf.Variable(tf.truncated_normal([3, 3, 256, 384],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'fc1': tf.Variable(
-            tf.truncated_normal([(fc_first_layer_dimen(image_size, conv_layers) ** 2) * depth_inc,
-                                 num_hidden_inc], stddev=stddev, seed=SEED), name='weights'),
-        'fc2': tf.Variable(tf.truncated_normal([num_hidden_inc, num_of_classes],
+        'conv4': tf.Variable(tf.truncated_normal([3, 3, 384, 384],
+                                                 stddev=stddev, seed=SEED), name='weights'),
+        'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256],
+                                                 stddev=stddev, seed=SEED), name='weights'),
+        'fc6': tf.Variable(tf.truncated_normal([9216, 4096],
+                                               stddev=stddev, seed=SEED), name='weights'),
+        'fc7': tf.Variable(tf.truncated_normal([4096, 4096],
+                                               stddev=stddev, seed=SEED), name='weights'),
+        'fc8': tf.Variable(tf.truncated_normal([4096, num_of_classes],
                                                stddev=stddev, seed=SEED), name='weights')
     }
     biases = {
-        'conv1': tf.Variable(tf.zeros([depth_inc]), name='biases'),
-        'conv2': tf.Variable(tf.zeros([depth_inc]), name='biases'),
-        'conv3': tf.Variable(tf.zeros([depth_inc]), name='biases'),
-        'fc1': tf.Variable(tf.zeros([num_hidden_inc], name='biases')),
-        'fc2': tf.Variable(tf.zeros([num_of_classes], name='biases'))
+        'conv1': tf.Variable(tf.zeros([96]), name='biases'),
+        'conv2': tf.Variable(tf.zeros([256]), name='biases'),
+        'conv3': tf.Variable(tf.zeros([384]), name='biases'),
+        'conv4': tf.Variable(tf.zeros([384]), name='biases'),
+        'conv5': tf.Variable(tf.zeros([256]), name='biases'),
+        'fc6': tf.Variable(tf.zeros([4096], name='biases')),
+        'fc7': tf.Variable(tf.zeros([4096], name='biases')),
+        'fc8': tf.Variable(tf.zeros([num_of_classes], name='biases'))
     }
 
     for weight_key in sorted(weights.keys()):
@@ -158,25 +201,28 @@ with graph.as_default():
         tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
     # L2 regularization for the fully connected parameters.
-    regularizers = (tf.nn.l2_loss(weights['fc1']) + tf.nn.l2_loss(biases['fc1']) +
-                    tf.nn.l2_loss(weights['fc2']) + tf.nn.l2_loss(biases['fc2']))
+    regularizers = (tf.nn.l2_loss(weights['fc6']) + tf.nn.l2_loss(biases['fc6']) +
+                    tf.nn.l2_loss(weights['fc7']) + tf.nn.l2_loss(biases['fc7']) +
+                    tf.nn.l2_loss(weights['fc8']) + tf.nn.l2_loss(biases['fc8']))
     # Add the regularization term to the loss.
     loss += 5e-4 * regularizers
 
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
     # Predictions for the training, validation, and test data.
     train_prediction = tf.nn.softmax(logits)
-    valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases))
-    test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
-    random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases))
+    #valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases))
+    #test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
+    #random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases))
 
-modelRestoreFile = os.path.realpath('../notMNIST_ann')
+#modelRestoreFile = os.path.realpath('../notMNIST_ann')
+modelRestoreFile = None
 modelSaveFile = os.path.realpath('../notMNIST_ann')
-evaluateFile = '/home/shams/Desktop/test_images_2/MDEtMDEtMDAudHRm.png'
+#evaluateFile = '/home/shams/Desktop/test_images_2/MDEtMDEtMDAudHRm.png'
+evaluateFile = None
 
 try:
     opts, args = getopt.getopt(sys.argv[1:],"ur:s:e:",["modelRestoreFile=","modelSaveFile=","evaluateFile="])
@@ -235,6 +281,7 @@ else:
             offset = (step * batch_size) % (dataset.train_labels.shape[0] - batch_size)
             # Generate a minibatch.
             batch_data = dataset.train_dataset[offset:(offset + batch_size), :]
+            batch_data = (np.array([imresize(x, (227, 227, 3)).astype(float) for x in batch_data]) - 255 / 2) / 255
             batch_labels = dataset.train_labels[offset:(offset + batch_size), :]
             # Prepare a dictionary telling the session where to feed the minibatch.
             # The key of the dictionary is the placeholder node of the graph to be fed,
@@ -247,9 +294,11 @@ else:
             writer.add_summary(summary_result, step)
 
             if (step % data_showing_step == 0):
+                #logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
+                #    step, accuracy(predictions, batch_labels), accuracy(
+                #    valid_prediction.eval(), dataset.valid_labels), l))
                 logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
-                    step, accuracy(predictions, batch_labels), accuracy(
-                    valid_prediction.eval(), dataset.valid_labels), l))
+                    step, accuracy(predictions, batch_labels), -1.0, l))
         if (modelSaveFile is not None):
             save_path = saver.save(session, modelSaveFile)
             print("Model saved in file: %s" % save_path)
