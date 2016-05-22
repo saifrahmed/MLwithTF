@@ -9,7 +9,7 @@ from scipy.misc import imresize
 
 logger.propagate = False
 
-batch_size = 8
+batch_size = 32
 num_steps = 3001
 learning_rate = 0.1
 
@@ -76,7 +76,7 @@ def nn_model(data, weights, biases, TRAIN=False):
     with tf.name_scope('Layer_3') as scope:
         conv = tf.nn.conv2d(max_pool, weights['conv3'], strides=[1, 1, 1, 1], padding='SAME', name='conv3')
         bias_add = tf.nn.bias_add(conv, biases['conv3'], name='bias_add_3')
-        max_pool = tf.nn.relu(bias_add, name='relu_3')
+        max_pool = tf.nn.relu(bias_add, name=scope)
         #max_pool = tf.nn.max_pool(max_pool, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='', name=scope)
         #if TRAIN:
         #    max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
@@ -101,7 +101,7 @@ def nn_model(data, weights, biases, TRAIN=False):
         conv = tf.nn.conv2d(max_pool, weights['conv5'], strides=[1, 1, 1, 1], padding='SAME', name='conv5')
         bias_add = tf.nn.bias_add(conv, biases['conv5'], name='bias_add_5')
         max_pool = tf.nn.relu(bias_add, name='relu_5')
-        max_pool = tf.nn.max_pool(max_pool, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name=scope)
+        max_pool = tf.nn.max_pool(max_pool, ksize=[1, 1, 1, 1], strides=[1, 1, 1, 1], padding='VALID', name=scope)
         # if TRAIN:
         #    max_pool = tf.nn.dropout(max_pool, dropout_prob, seed=SEED, name='dropout')
 
@@ -148,7 +148,7 @@ with graph.as_default():
     # Input data. For the training data, we use a placeholder that will be fed
     # at run time with a training minibatch.
     tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, 227, 227, num_channels), name='TRAIN_DATASET')
+                                      shape=(batch_size, image_size, image_size, num_channels), name='TRAIN_DATASET')
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
     tf_valid_dataset = tf.constant(dataset.valid_dataset, name='VALID_DATASET')
     tf_test_dataset = tf.constant(dataset.test_dataset, name='TEST_DATASET')
@@ -161,21 +161,21 @@ with graph.as_default():
 
     # Variables.
     weights = {
-        'conv1': tf.Variable(tf.truncated_normal([11, 11, 3, 96],
+        'conv1': tf.Variable(tf.truncated_normal([5, 5, 3, 96],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([5, 5, 96, 256],
+        'conv2': tf.Variable(tf.truncated_normal([3, 3, 96, 256],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([3, 3, 256, 384],
+        'conv3': tf.Variable(tf.truncated_normal([1, 1, 256, 384],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv4': tf.Variable(tf.truncated_normal([3, 3, 384, 384],
+        'conv4': tf.Variable(tf.truncated_normal([1, 1, 384, 384],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256],
+        'conv5': tf.Variable(tf.truncated_normal([1, 1, 384, 256],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'fc6': tf.Variable(tf.truncated_normal([9216, 4096],
+        'fc6': tf.Variable(tf.truncated_normal([256, 1024],
                                                stddev=stddev, seed=SEED), name='weights'),
-        'fc7': tf.Variable(tf.truncated_normal([4096, 4096],
+        'fc7': tf.Variable(tf.truncated_normal([1024, 1024],
                                                stddev=stddev, seed=SEED), name='weights'),
-        'fc8': tf.Variable(tf.truncated_normal([4096, num_of_classes],
+        'fc8': tf.Variable(tf.truncated_normal([1024, num_of_classes],
                                                stddev=stddev, seed=SEED), name='weights')
     }
     biases = {
@@ -184,8 +184,8 @@ with graph.as_default():
         'conv3': tf.Variable(tf.zeros([384]), name='biases'),
         'conv4': tf.Variable(tf.zeros([384]), name='biases'),
         'conv5': tf.Variable(tf.zeros([256]), name='biases'),
-        'fc6': tf.Variable(tf.zeros([4096], name='biases')),
-        'fc7': tf.Variable(tf.zeros([4096], name='biases')),
+        'fc6': tf.Variable(tf.zeros([1024], name='biases')),
+        'fc7': tf.Variable(tf.zeros([1024], name='biases')),
         'fc8': tf.Variable(tf.zeros([num_of_classes], name='biases'))
     }
 
@@ -205,18 +205,18 @@ with graph.as_default():
                     tf.nn.l2_loss(weights['fc7']) + tf.nn.l2_loss(biases['fc7']) +
                     tf.nn.l2_loss(weights['fc8']) + tf.nn.l2_loss(biases['fc8']))
     # Add the regularization term to the loss.
-    loss += 5e-4 * regularizers
+    loss += 0.0 * regularizers
 
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
     # Predictions for the training, validation, and test data.
     train_prediction = tf.nn.softmax(logits)
-    #valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases))
-    #test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
-    #random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases))
+    valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases))
+    test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases))
+    random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases))
 
 #modelRestoreFile = os.path.realpath('../notMNIST_ann')
 modelRestoreFile = None
@@ -281,7 +281,6 @@ else:
             offset = (step * batch_size) % (dataset.train_labels.shape[0] - batch_size)
             # Generate a minibatch.
             batch_data = dataset.train_dataset[offset:(offset + batch_size), :]
-            batch_data = (np.array([imresize(x, (227, 227, 3)).astype(float) for x in batch_data]) - 255 / 2) / 255
             batch_labels = dataset.train_labels[offset:(offset + batch_size), :]
             # Prepare a dictionary telling the session where to feed the minibatch.
             # The key of the dictionary is the placeholder node of the graph to be fed,
@@ -294,11 +293,11 @@ else:
             writer.add_summary(summary_result, step)
 
             if (step % data_showing_step == 0):
-                #logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
-                #    step, accuracy(predictions, batch_labels), accuracy(
-                #    valid_prediction.eval(), dataset.valid_labels), l))
                 logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
-                    step, accuracy(predictions, batch_labels), -1.0, l))
+                    step, accuracy(predictions, batch_labels), accuracy(
+                    valid_prediction.eval(), dataset.valid_labels), l))
+                #logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
+                #    step, accuracy(predictions, batch_labels), -1.0, l))
         if (modelSaveFile is not None):
             save_path = saver.save(session, modelSaveFile)
             print("Model saved in file: %s" % save_path)
