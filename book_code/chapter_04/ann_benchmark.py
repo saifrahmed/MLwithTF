@@ -9,7 +9,7 @@ from scipy.misc import imresize
 
 logger.propagate = False
 
-batch_size = 32
+batch_size = 8
 num_steps = 3001
 learning_rate = 0.1
 

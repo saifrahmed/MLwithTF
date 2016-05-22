@@ -404,7 +404,7 @@ def prepare_cifar_10_dataset():
     train_dataset, train_labels, valid_dataset, valid_labels, \
     test_dataset, test_labels = pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
                                                 train_size, valid_size, test_size,
-                                                os.path.realpath('../../datasets/CIFAR-10/CIFAR-10.pickle'), True)
+                                                os.path.realpath('../../datasets/CIFAR-10/CIFAR-10.pickle'), False)
     print('Finished pickling final dataset')
 
     print('Finished preparing CIFAR-10 dataset')
