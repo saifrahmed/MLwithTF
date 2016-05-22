@@ -22,7 +22,7 @@ conv_layers = 3
 SEED = 11215
 stddev = 0.1
 
-data_showing_step = 500
+data_showing_step = 50
 
 log_location = '/tmp/alex_nn_log'
 
@@ -210,7 +210,7 @@ with graph.as_default():
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
-    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
 
     # Predictions for the training, validation, and test data.
     train_prediction = tf.nn.softmax(logits)
