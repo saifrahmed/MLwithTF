@@ -158,13 +158,13 @@ with graph.as_default():
                                                  stddev=stddev, seed=SEED), name='weights'),
         'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256],
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'fc6': tf.Variable(tf.truncated_normal([9216, 4096],
+        'fc6': tf.Variable(tf.truncated_normal([9216, 128],
                                                stddev=stddev, seed=SEED), name='weights'),
-        'fc7': tf.Variable(tf.truncated_normal([4096, 4096],
+        'fc7': tf.Variable(tf.truncated_normal([128, 64],
                                                stddev=stddev, seed=SEED), name='weights'),
-        'fc8': tf.Variable(tf.truncated_normal([4096, 1000],
+        'fc8': tf.Variable(tf.truncated_normal([64, 32],
                                                stddev=stddev, seed=SEED), name='weights'),
-        'fc9': tf.Variable(tf.truncated_normal([1000, num_of_classes],
+        'fc9': tf.Variable(tf.truncated_normal([32, num_of_classes],
                                                stddev=stddev, seed=SEED), name='weights')
     }
     biases = {
@@ -173,9 +173,9 @@ with graph.as_default():
         'conv3': tf.Variable(tf.zeros([384]), name='biases'),
         'conv4': tf.Variable(tf.zeros([384]), name='biases'),
         'conv5': tf.Variable(tf.zeros([256]), name='biases'),
-        'fc6': tf.Variable(tf.zeros([4096], name='biases')),
-        'fc7': tf.Variable(tf.zeros([4096], name='biases')),
-        'fc8': tf.Variable(tf.zeros([1000], name='biases')),
+        'fc6': tf.Variable(tf.zeros([128], name='biases')),
+        'fc7': tf.Variable(tf.zeros([64], name='biases')),
+        'fc8': tf.Variable(tf.zeros([32], name='biases')),
         'fc9': tf.Variable(tf.zeros([num_of_classes], name='biases'))
     }
 
@@ -212,7 +212,6 @@ with tf.Session(graph=graph) as session:
     writer = tf.train.SummaryWriter(log_location, session.graph_def)
 
     tf.initialize_all_variables().run()
-    saver = tf.train.Saver()
 
     print("Initialized")
     for step in range(num_steps):
