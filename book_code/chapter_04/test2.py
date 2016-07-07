@@ -12,16 +12,17 @@ test_pickle_files = ['test_batch']
 test_images_folder = '/home/shams/Desktop/pycharm_projects/cifar-10_improv/test_images'
 current_pickle_file = cifar_data_folder + '/' + train_pickle_files[0]
 
-log_location = '/home/shams/Desktop/pycharm_projects/cifar-10_improv/alex_nn_log'
+log_location = '/tmp/alex_nn_log'
+checkpoints_location = '/tmp/cifar-10_improv/checkpoints/test2_model.ckpt'
 batch_size = 32
-learning_rate = 0.02
+learning_rate = 0.1
 num_of_classes = 10
 SEED = 11215
-stddev = 0.1
-stddev_fc = 0.05
+stddev = 0.05
+stddev_fc = 0.01
 data_showing_step = 50
 num_steps = 100001
-regularization_factor = 0   #5e-4
+regularization_factor = 5e-4
 
 
 def load_cifar_10_pickle(pickle_file):
@@ -29,6 +30,7 @@ def load_cifar_10_pickle(pickle_file):
     dict = pickle.load(fo)
     fo.close()
     return np.array(dict['data']).astype(float), np.array(dict['labels'])
+
 
 def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_batch_size, image_size,
                                    num_of_channels):
@@ -87,6 +89,7 @@ def reshape_linear_fast(data, shape, channels):
 def reshape_labels(data, classes):
     return (np.arange(classes) == data[:, None]).astype(np.float32)
 
+
 def normalize(data):
     return (data - 255/2) / 255
 
@@ -117,8 +120,13 @@ def nn_model(data, weights, biases, TRAIN=False):
         relu = tf.nn.relu(bias_add, name='relu_3')
         max_pool = tf.nn.max_pool(relu, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name=scope)
 
-    shape = max_pool.get_shape().as_list()
-    reshape = tf.reshape(max_pool, [shape[0], shape[1] * shape[2] * shape[3]])
+    with tf.name_scope('Layer_4') as scope:
+        conv = tf.nn.conv2d(max_pool, weights['conv4'], strides=[1, 1, 1, 1], padding='SAME', name='conv4')
+        bias_add = tf.nn.bias_add(conv, biases['conv4'], name='bias_add_4')
+        relu = tf.nn.relu(bias_add, name=scope)
+
+    shape = relu.get_shape().as_list()
+    reshape = tf.reshape(relu, [shape[0], shape[1] * shape[2] * shape[3]])
 
     with tf.name_scope('FC_Layer_6') as scope:
         matmul = tf.matmul(reshape, weights['fc6'], name='fc6_matmul')
@@ -165,32 +173,39 @@ with graph.as_default():
                                       shape=(valid_data.shape[0], 32, 32, 3), name='VALID_DATASET')
     tf_test_dataset = tf.constant(test_data, tf.float32,
                                       shape=(test_data.shape[0], 32, 32, 3), name='TEST_DATASET')
-
+    learning_rate_decayed = tf.placeholder(tf.float32, shape=[], name='learning_rate_decayed')
     # Variables.
     weights = {
-        'conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 64], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([3, 3, 64, 194], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([1, 1, 194, 256], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'fc6': tf.Variable(tf.truncated_normal([256, 128], dtype=tf.float32,
-                                               stddev=stddev_fc, seed=SEED), name='weights'),
-        'fc7': tf.Variable(tf.truncated_normal([128, num_of_classes], dtype=tf.float32,
-                                               stddev=stddev_fc, seed=SEED), name='weights')
+        'conv1': tf.Variable(tf.truncated_normal([3, 3, 3, 128], dtype=tf.float32,
+                                                 stddev=stddev, seed=SEED), name='weights_conv1'),
+        'conv2': tf.Variable(tf.truncated_normal([3, 3, 128, 384], dtype=tf.float32,
+                                                 stddev=stddev, seed=SEED), name='weights_conv2'),
+        'conv3': tf.Variable(tf.truncated_normal([1, 1, 384, 512], dtype=tf.float32,
+                                                 stddev=stddev, seed=SEED), name='weights_conv3'),
+        'conv4': tf.Variable(tf.truncated_normal([1, 1, 512, 512], dtype=tf.float32,
+                                                 stddev=stddev, seed=SEED), name='weights_conv4'),
+        'fc6': tf.Variable(tf.truncated_normal([512, 256], dtype=tf.float32,
+                                               stddev=stddev_fc, seed=SEED), name='weights_fc6'),
+        'fc7': tf.Variable(tf.truncated_normal([256, num_of_classes], dtype=tf.float32,
+                                               stddev=stddev_fc, seed=SEED), name='weights_fc7')
     }
     biases = {
-        'conv1': tf.Variable(tf.constant(0.1, shape=[64], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv2': tf.Variable(tf.constant(0.1, shape=[194], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv3': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'fc6': tf.Variable(tf.constant(0.1, shape=[128], dtype=tf.float32),
-                         trainable=True, name='biases'),
+        'conv1': tf.Variable(tf.constant(0.1, shape=[128], dtype=tf.float32),
+                         trainable=True, name='biases_conv1'),
+        'conv2': tf.Variable(tf.constant(0.1, shape=[384], dtype=tf.float32),
+                         trainable=True, name='biases_conv1'),
+        'conv3': tf.Variable(tf.constant(0.1, shape=[512], dtype=tf.float32),
+                         trainable=True, name='biases_conv1'),
+        'conv4': tf.Variable(tf.constant(0.1, shape=[512], dtype=tf.float32),
+                             trainable=True, name='biases_conv4'),
+        'fc6': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
+                         trainable=True, name='biases_fc6'),
         'fc7': tf.Variable(tf.constant(0.1, shape=[num_of_classes], dtype=tf.float32),
-                         trainable=True, name='biases'),
+                         trainable=True, name='biases_fc7'),
     }
+
+    # Add ops to save and restore all the variables.
+    saver = tf.train.Saver()
 
     for weight_key in sorted(weights.keys()):
         _ = tf.histogram_summary(weight_key + '_weights', weights[weight_key])
@@ -212,7 +227,7 @@ with graph.as_default():
     _ = tf.scalar_summary('nn_loss', loss)
 
     # Optimizer.
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate_decayed).minimize(loss)
 
     # Predictions for the training, validation, and test data.
     train_prediction = tf.nn.softmax(nn_model(tf_train_dataset, weights, biases, TRAIN=False))
@@ -226,8 +241,18 @@ with tf.Session(graph=graph) as session:
 
     tf.initialize_all_variables().run()
 
+    # Restore variables from disk.
+    saver.restore(session, checkpoints_location)
+
     print("Initialized")
     for step in range(num_steps):
+        if 30000 < step < 80000:
+            learning_rate = 0.02 / 5
+        elif 80000 <= step < 200000:
+            learning_rate = 0.02 / 10
+        else:
+            learning_rate = 0.02
+
         sys.stdout.write('Training on batch %d of %d\r' % (step + 1, num_steps))
         sys.stdout.flush()
         offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
@@ -235,7 +260,7 @@ with tf.Session(graph=graph) as session:
         batch_data = train_data[offset:(offset + batch_size), :]
         batch_labels = train_labels[offset:(offset + batch_size), :]
         #print(np.argmax(batch_labels, 1))
-        feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
+        feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels, learning_rate_decayed: learning_rate}
         # print feed_dict
         summary_result, _, l, predictions = session.run(
             [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
@@ -243,7 +268,12 @@ with tf.Session(graph=graph) as session:
         writer.add_summary(summary_result, step)
 
         if (step % data_showing_step == 0):
-            print('Step %03d  Acc-Minibatch: %03.2f%% Acc-Valid: %03.2f%% Minibatch loss %f' %
-                  (step, accuracy(predictions, batch_labels), accuracy(valid_prediction.eval(), valid_labels), l))
+            print('Step %03d  Acc-Minibatch: %03.2f%% Acc-Valid: %03.2f%% Minibatch loss: %f Learning Rate: %f' %
+                  (step, accuracy(predictions, batch_labels), accuracy(valid_prediction.eval(), valid_labels), l,
+                   learning_rate))
+
+        if ((step + 1)% 1000 == 0):
+            # Save the variables to disk.
+            save_path = saver.save(session, checkpoints_location)
 
     print('Acc-Test: %03.2f%%' % accuracy(test_prediction.eval(), test_labels))

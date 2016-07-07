@@ -1,68 +1,183 @@
-import sys
-import numpy as np
-import pickle
-from scipy.misc import imsave, imresize
+import sys, os
 import tensorflow as tf
 
-cifar_data_folder = '../../datasets/CIFAR-10/data/cifar-10-batches-py'
-train_pickle_files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4',
-                      'data_batch_5']
-test_pickle_files = ['test_batch']
+sys.path.append(os.path.realpath('../..'))
+from book_code.data_utils import *
+from book_code.logmanager import *
+import math
+import getopt
+from scipy.misc import imresize
 
-test_images_folder = '/home/shams/Desktop/pycharm_projects/cifar-10_improv/test_images'
-current_pickle_file = cifar_data_folder + '/' + train_pickle_files[0]
+logger.propagate = False
 
-log_location = '/tmp/cifar-10_improv/alex_nn_log'
 batch_size = 32
-learning_rate = 1.0
-num_of_classes = 10
+num_steps = 3001
+learning_rate = 0.1
+
+patch_size = 5
+depth_inc = 4
+num_hidden_inc = 32
+dropout_prob = 0.8
+
+conv_layers = 3
 SEED = 11215
-stddev = 0.01
+stddev = 0.1
 stddev_fc = 0.005
 data_showing_step = 50
-num_steps = 100001
+
+log_location = '/tmp/alex_nn_log'
 
 
-def load_cifar_10_pickle(pickle_file):
-    fo = open(pickle_file, 'rb')
-    dict = pickle.load(fo)
-    fo.close()
-    return np.array(dict['data']).astype(float), np.array(dict['labels'])
-
-def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_batch_size, image_size,
-                                   num_of_channels):
-
-    all_train_data = np.ndarray(shape=(pickle_batch_size * len(train_pickle_files),
-                                       image_size * image_size * num_of_channels),
-                                dtype=np.float32)
-
-    all_train_labels = np.ndarray(shape=pickle_batch_size * len(train_pickle_files), dtype=np.float32)
-
-    all_test_data = np.ndarray(shape=(pickle_batch_size * len(test_pickle_files),
-                                      image_size * image_size * num_of_channels),
-                               dtype=np.float32)
-    all_test_labels = np.ndarray(shape=pickle_batch_size * len(test_pickle_files), dtype=np.float32)
-
-    print('Started loading training data')
-    for index, train_pickle_file in enumerate(train_pickle_files):
-        all_train_data[index * pickle_batch_size: (index + 1) * pickle_batch_size, :], \
-        all_train_labels[index * pickle_batch_size: (index + 1) * pickle_batch_size] = \
-            load_cifar_10_pickle(train_pickle_file)
-    print('Finished loading training data\n')
-
-    print('Started loading testing data')
-    for index, test_pickle_file in enumerate(test_pickle_files):
-        all_test_data[index * pickle_batch_size: (index + 1) * pickle_batch_size, :], \
-        all_test_labels[index * pickle_batch_size: (index + 1) * pickle_batch_size] = \
-            load_cifar_10_pickle(test_pickle_file)
-    print('Finished loading testing data')
-
-    return all_train_data, all_train_labels, all_test_data, all_test_labels
+def reformat(dataset, labels, image_shape, num_labels, num_channels):
+    dataset = dataset.reshape(
+        (-1, image_shape[0], image_shape[1], num_channels)).astype(np.float32)
+    labels = (np.arange(num_labels) == labels[:, None]).astype(np.float32)
+    return dataset, labels
 
 
 def accuracy(predictions, labels):
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
             / predictions.shape[0])
+
+
+def get_valid_and_test_batch_size(image_shape, safety_percentage, train_batch_size,
+                                  valid_size, test_size, memory_available):
+    image_bytes = image_shape[0] * image_shape[1] * image_shape[2] * 4
+    train_batch_bytes = train_batch_size * image_bytes
+    remaining_bytes = int(memory_available * safety_percentage - train_batch_bytes)
+
+    valid_total_bytes = valid_size * image_bytes
+    test_total_bytes = test_size * image_bytes
+
+    if valid_total_bytes >= test_total_bytes:
+        if valid_total_bytes <= remaining_bytes // 2:
+            valid_batch_size = valid_size
+            test_batch_size = test_size
+        else:
+            if test_total_bytes <= remaining_bytes // 2:
+                test_batch_size = test_size
+
+                remaining_valid_bytes = remaining_bytes - test_total_bytes
+                valid_batch_size = remaining_valid_bytes // image_bytes
+                if valid_batch_size > valid_size:
+                    valid_batch_size = valid_size
+            else:
+                test_batch_size = (remaining_bytes // 2) // image_bytes
+                if test_batch_size > test_size:
+                    test_batch_size = test_size
+
+                valid_batch_size = (remaining_bytes // 2) // image_bytes
+                if valid_batch_size > valid_size:
+                    valid_batch_size = valid_size
+
+    else:
+        if test_total_bytes <= remaining_bytes // 2:
+            test_batch_size = test_size
+            valid_batch_size = valid_size
+        else:
+            if valid_total_bytes <= remaining_bytes // 2:
+                valid_batch_size = valid_size
+
+                remaining_test_bytes = remaining_bytes - valid_total_bytes
+                test_batch_size = remaining_test_bytes // image_bytes
+                if test_batch_size > test_size:
+                    test_batch_size = test_size
+            else:
+                valid_batch_size = (remaining_bytes // 2) // image_bytes
+                if valid_batch_size > valid_size:
+                    valid_batch_size = valid_size
+
+                test_batch_size = (remaining_bytes // 2) // image_bytes
+                if test_batch_size > test_size:
+                    test_batch_size = test_size
+
+    return valid_batch_size, test_batch_size
+
+
+def preprocess_images(images, image_shape, channels, pixel_depth):
+    images = imresize(images, (image_shape[0], image_shape[1], channels), interp='bicubic')
+    return (images - pixel_depth / 2) / pixel_depth
+
+
+def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixel_depth, num_labels,
+               num_channels):
+    batch_data = np.ndarray(shape=(batch_size, image_shape[0], image_shape[1]), dtype=np.float32)
+
+    batch_labels = np.ndarray(shape=batch_size, dtype=np.int32)
+
+    image_index = 0
+    skipped_images = 0
+    index = 0
+    length_dataset = len(dataset_file_paths)
+
+    last_seen_good_image = np.array([])
+    last_seen_good_label = -1
+
+    while image_index < batch_size and (offset + index) < length_dataset:
+        try:
+            image = ndimage.imread(dataset_file_paths[offset + index]).astype(float)
+            image_data = preprocess_images(image, image_shape, num_channels, pixel_depth)
+
+            last_seen_good_image = image_data
+            last_seen_good_label = labels[offset + index]
+
+            if image_data.shape != image_shape:
+
+                if last_seen_good_label != -1:
+                    batch_data[image_index, :, :] = last_seen_good_image
+                    batch_labels[image_index] = last_seen_good_label
+                    image_index += 1
+
+                skipped_images += 1
+                print('Unexpected image shape: %s' % str(image_data.shape))
+            else:
+                batch_data[image_index, :, :] = image_data
+                batch_labels[image_index] = labels[offset + index]
+                image_index += 1
+        except IOError as e:
+            if last_seen_good_label != -1:
+                batch_data[image_index, :, :] = last_seen_good_image
+                batch_labels[image_index] = last_seen_good_label
+                image_index += 1
+
+            skipped_images += 1
+            logger.warn('Skipping unreadable image:' + dataset_file_paths[offset + index] + ': ' + str(e))
+        index += 1
+
+    batch_data = batch_data[0:image_index, :, :]
+    batch_labels = batch_labels[0:image_index]
+
+    batch_data, batch_labels = reformat(batch_data, batch_labels, image_shape, num_labels, num_channels)
+
+    return batch_data, batch_labels, skipped_images
+
+
+def accuracy_batches(session, tf_dataset, prediction, dataset,
+                     labels, batch_size, image_shape, image_depth,
+                     num_classes, channels):
+    steps = len(labels) // batch_size
+    skipped_images = 0
+    total_checked = 0
+    correct_sum = 0
+    for batch_step in range(steps):
+        offset = (batch_step * batch_size)
+        batch_data, batch_labels, skipped = load_batch(dataset,
+                                                       labels,
+                                                       offset + skipped_images,
+                                                       batch_size,
+                                                       image_shape,
+                                                       image_depth,
+                                                       num_classes,
+                                                       channels)
+
+        skipped_images += skipped
+
+        total_checked += len(batch_labels)
+        feed_dict = {tf_dataset: batch_data}
+        correct_sum += np.sum(
+            np.argmax(session.run(prediction, feed_dict=feed_dict), 1)
+            == np.argmax(batch_labels, 1))
+        return 100.0 * correct_sum / total_checked
 
 
 def nn_model(data, weights, biases, TRAIN=False):
@@ -126,48 +241,22 @@ def nn_model(data, weights, biases, TRAIN=False):
 
     return layer_fc9
 
-data, labels, test_data, test_labels = load_cifar_10_from_pickles([cifar_data_folder + '/' + x for x in
-                                                                   train_pickle_files],
-                                                                  [cifar_data_folder + '/' + x for x in
-                                                                   test_pickle_files], 10000, 32, 3)
 
-train_data = data[0:45000]
-train_labels = labels[0:45000]
-valid_data = data[45000:50000]
-valid_labels = labels[45000:50000]
-
-print(train_data.shape, train_labels.shape, valid_data.shape, valid_labels.shape, test_data.shape, test_labels.shape)
-
-#for i in range(20):
-#    reshapedImage = data[i].reshape((3, 32, 32))
-#    types = ['nearest', 'bilinear', 'bicubic', 'cubic']
-#    for type in types:
-#        resizedImage = imresize(reshapedImage, (227, 227, 3), interp=type)
-#        imsave(test_images_folder + '/image' + str(i) + '_' + type + '.png', resizedImage)
-#        reformatedImage = resizedImage.astype(float)
-#    print(i)
-
-validReshapedImages = valid_data[0:100].reshape((-1, 3, 32, 32))
-validResizedImages = np.array([imresize(validReshapedImage, (227, 227, 3), interp='bicubic').astype(np.float32)
-                          for validReshapedImage in validReshapedImages])
-validDataToUse = (validResizedImages - 255 / 2) / 255
-validLabelsToUse = (np.arange(num_of_classes) == valid_labels[0:100][:, None]).astype(np.float32)
-
-testReshapedImages = test_data[0:200].reshape((-1, 3, 32, 32))
-testResizedImages = np.array([imresize(testReshapedImage, (227, 227, 3), interp='bicubic').astype(np.float32)
-                          for testReshapedImage in testReshapedImages])
-testDataToUse = (testResizedImages - 255 / 2) / 255
-testLabelsToUse = (np.arange(num_of_classes) == test_labels[0:200][:, None]).astype(np.float32)
+dataset, image_size, num_of_classes = prepare_DR_dataset()
+valid_batch_size, test_batch_size = get_valid_and_test_batch_size((1500, 1500, 3), 0.8, batch_size,
+                                                                  len(dataset.valid_dataset),
+                                                                  len(dataset.test_dataset),
+                                                                  2 * (1024 ** 3))
 
 graph = tf.Graph()
 with graph.as_default():
     tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, 227, 227, 3), name='TRAIN_DATASET')
+                                      shape=(batch_size, 1500, 1500, 3), name='TRAIN_DATASET')
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
-    tf_valid_dataset = tf.constant(validDataToUse, tf.float32,
-                                      shape=(100, 227, 227, 3), name='VALID_DATASET')
-    tf_test_dataset = tf.constant(testDataToUse, tf.float32,
-                                      shape=(200, 227, 227, 3), name='TEST_DATASET')
+    tf_valid_dataset = tf.placeholder(tf.float32,
+                                      shape=(batch_size, 1500, 1500, 3), name='VALID_DATASET')
+    tf_test_dataset = tf.placeholder(tf.float32,
+                                      shape=(batch_size, 1500, 1500, 3), name='TEST_DATASET')
 
     # Variables.
     weights = {

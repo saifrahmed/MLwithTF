@@ -1,3 +1,4 @@
+import csv
 import os, sys, tarfile
 from six.moves.urllib.request import urlretrieve
 
@@ -307,6 +308,23 @@ def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_la
     return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
 
 
+def load_classes_from_csv(images_base_path, csv_location):
+    fieldnames = ['image', 'level']
+
+    with open(csv_location) as csvfile:
+        reader = csv.DictReader(csvfile)
+
+        num_of_images = 35126
+        image_paths = np.ndarray(shape=num_of_images, dtype=object)
+        labels = np.ndarray(shape=num_of_images, dtype=int)
+
+        for row_index, row in enumerate(reader):
+            image_paths[row_index] = images_base_path.format(row[fieldnames[0]])
+            labels[row_index] = int(row[fieldnames[1]])
+
+        return image_paths, labels
+
+
 def prepare_not_mnist_dataset():
     print('Started preparing notMNIST dataset')
 
@@ -419,3 +437,41 @@ def prepare_cifar_10_dataset():
     cifar_10.test_labels = test_labels
 
     return cifar_10, image_size, num_of_classes, num_of_channels
+
+
+def prepare_DR_dataset():
+    print('Started preparing Diabetic Retinopathy dataset')
+
+    # Assuming the image files are already downloaded in the folder '../../datasets/DiabeticRetinopathy/train
+    # and
+    # Assuming the image labels are already downloaded at the location '../../datasets/DiabeticRetinopathy/trainLabels.csv
+
+    image_size = (1500, 1500)
+    num_of_classes = 5
+
+    # Total 35126 images
+    train_size = 30000
+    valid_size = 2000
+    test_size = 3126
+
+    image_paths, image_labels = load_classes_from_csv(os.path.realpath('../../datasets/DiabeticRetinopathy/train/{}.jpeg'),
+                                                      os.path.realpath('../../datasets/DiabeticRetinopathy/trainLabels.csv'))
+
+    print(image_paths)
+    print(image_labels)
+
+    print(image_paths.size)
+    print(image_labels.size)
+
+    print('Finished preparing Diabetic Retinopathy dataset')
+
+    def DR(): pass
+
+    DR.train_dataset = image_paths[0:train_size]
+    DR.train_labels = image_labels[0:train_size]
+    DR.valid_dataset = image_paths[train_size:train_size + valid_size]
+    DR.valid_labels = image_labels[train_size:train_size + valid_size]
+    DR.test_dataset = image_paths[train_size + valid_size:train_size + valid_size + test_size]
+    DR.test_labels = image_labels[train_size + valid_size:train_size + valid_size + test_size]
+
+    return DR, image_size, num_of_classes
