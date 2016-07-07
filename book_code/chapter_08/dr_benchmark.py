@@ -101,7 +101,7 @@ def preprocess_images(images, image_shape, channels, pixel_depth):
 
 def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixel_depth, num_labels,
                num_channels):
-    batch_data = np.ndarray(shape=(batch_size, image_shape[0], image_shape[1]), dtype=np.float32)
+    batch_data = np.ndarray(shape=(batch_size, image_shape[0], image_shape[1], num_channels), dtype=np.float32)
 
     batch_labels = np.ndarray(shape=batch_size, dtype=np.int32)
 
@@ -121,30 +121,31 @@ def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixe
             last_seen_good_image = image_data
             last_seen_good_label = labels[offset + index]
 
-            if image_data.shape != image_shape:
-
+            if image_data.shape != (image_shape[0], image_shape[1], num_channels):
+                print('Unexpected image shape: %s' % str(image_data.shape))
                 if last_seen_good_label != -1:
-                    batch_data[image_index, :, :] = last_seen_good_image
+                    batch_data[image_index, :, :, :] = last_seen_good_image
                     batch_labels[image_index] = last_seen_good_label
                     image_index += 1
 
                 skipped_images += 1
-                print('Unexpected image shape: %s' % str(image_data.shape))
+
             else:
-                batch_data[image_index, :, :] = image_data
+                batch_data[image_index, :, :, :] = image_data
                 batch_labels[image_index] = labels[offset + index]
                 image_index += 1
         except IOError as e:
+            logger.warn('Skipping unreadable image:' + dataset_file_paths[offset + index] + ': ' + str(e))
             if last_seen_good_label != -1:
-                batch_data[image_index, :, :] = last_seen_good_image
+                batch_data[image_index, :, :, :] = last_seen_good_image
                 batch_labels[image_index] = last_seen_good_label
                 image_index += 1
 
             skipped_images += 1
-            logger.warn('Skipping unreadable image:' + dataset_file_paths[offset + index] + ': ' + str(e))
+
         index += 1
 
-    batch_data = batch_data[0:image_index, :, :]
+    batch_data = batch_data[0:image_index, :, :, :]
     batch_labels = batch_labels[0:image_index]
 
     batch_data, batch_labels = reformat(batch_data, batch_labels, image_shape, num_labels, num_channels)
@@ -243,7 +244,7 @@ def nn_model(data, weights, biases, TRAIN=False):
 
 
 dataset, image_size, num_of_classes = prepare_DR_dataset()
-valid_batch_size, test_batch_size = get_valid_and_test_batch_size((1500, 1500, 3), 0.8, batch_size,
+valid_batch_size, test_batch_size = get_valid_and_test_batch_size((image_size[0], image_size[1], 3), 0.8, batch_size,
                                                                   len(dataset.valid_dataset),
                                                                   len(dataset.test_dataset),
                                                                   2 * (1024 ** 3))
@@ -251,12 +252,12 @@ valid_batch_size, test_batch_size = get_valid_and_test_batch_size((1500, 1500, 3
 graph = tf.Graph()
 with graph.as_default():
     tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, 1500, 1500, 3), name='TRAIN_DATASET')
+                                      shape=(batch_size, image_size[0], image_size[1], 3), name='TRAIN_DATASET')
     tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
     tf_valid_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, 1500, 1500, 3), name='VALID_DATASET')
+                                      shape=(batch_size, image_size[0], image_size[1], 3), name='VALID_DATASET')
     tf_test_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, 1500, 1500, 3), name='TEST_DATASET')
+                                      shape=(batch_size, image_size[0], image_size[1], 3), name='TEST_DATASET')
 
     # Variables.
     weights = {
@@ -270,7 +271,7 @@ with graph.as_default():
                                                  stddev=stddev, seed=SEED), name='weights'),
         'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256], dtype=tf.float32,
                                                  stddev=stddev, seed=SEED), name='weights'),
-        'fc6': tf.Variable(tf.truncated_normal([9216, 4096], dtype=tf.float32,
+        'fc6': tf.Variable(tf.truncated_normal([50176, 4096], dtype=tf.float32,
                                                stddev=stddev_fc, seed=SEED), name='weights'),
         'fc7': tf.Variable(tf.truncated_normal([4096, 4096], dtype=tf.float32,
                                                stddev=stddev_fc, seed=SEED), name='weights'),
@@ -329,37 +330,51 @@ with graph.as_default():
     valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases, TRAIN=False))
     test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases, TRAIN=False))
 
+    skipped_images = 0
+
 with tf.Session(graph=graph) as session:
     # saving graph
     merged = tf.merge_all_summaries()
     writer = tf.train.SummaryWriter(log_location, session.graph_def)
 
     tf.initialize_all_variables().run()
-
-    print("Initialized")
+    logger.info('Session Initialized')
     for step in range(num_steps):
-        sys.stdout.write('Training on batch %d of %d\r' % (step + 1, num_steps))
-        sys.stdout.flush()
-        offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
-        # Generate a minibatch.
-        batch_data = train_data[offset:(offset + batch_size), :]
-        reshapedImages = batch_data.reshape((-1, 3, 32, 32))
-        resizedImages = np.array([imresize(reshapedImage, (227, 227, 3), interp='bicubic').astype(np.float32)
-                         for reshapedImage in reshapedImages])
-        #for index, resizedImage in enumerate(resizedImages):
-        #    imsave(test_images_folder + '/image' + str(index) + '_bicubic.png', resizedImage)
-        batch_data = (resizedImages - 255/2) / 255
-        batch_labels = (np.arange(num_of_classes) == train_labels[offset:(offset + batch_size)][:, None]).astype(np.float32)
-        #print(np.argmax(batch_labels, 1))
+        offset = (step * batch_size) % (dataset.train_dataset.shape[0] - batch_size)
+        if step % 100 == 0:
+            #logger.info('Loading Batch for step ' + str(step))
+            sys.stdout.write('Loading Batch for step ' + str(step) + '\r')
+            sys.stdout.flush()
+        batch_data, batch_labels, skipped = load_batch(dataset.train_dataset, dataset.train_labels,
+                                                            offset + skipped_images,
+                                                            batch_size,
+                                                            (image_size[0], image_size[1]),
+                                                            255,
+                                                            5, 3)
+        skipped_images += skipped
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
-        # print feed_dict
-        summary_result, _, l, predictions = session.run(
-            [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
-
-        writer.add_summary(summary_result, step)
-
+        _, sum_string, l, predictions = session.run(
+            [optimizer, merged, loss, train_prediction], feed_dict=feed_dict)
         if (step % data_showing_step == 0):
-            print('Step %03d  Acc-Minibatch: %03.2f%% Acc-Valid: %03.2f%% Minibatch loss %f' %
-                  (step, accuracy(predictions, batch_labels), accuracy(valid_prediction.eval(), validLabelsToUse), l))
+            writer.add_summary(sum_string, step)
 
-    print('Acc-Test: %03.2f%%' % accuracy(test_prediction.eval(), testLabelsToUse))
+            # print('Minibatch loss at step %d: %f' % (step, l))
+            # print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
+            miniBatchAccuracy = accuracy(predictions, batch_labels)
+
+            validationAccuracy = accuracy_batches(session, tf_valid_dataset, valid_prediction, dataset.valid_dataset,
+                                                  dataset.valid_labels, valid_batch_size,
+                                                  (image_size[0], image_size[1]), 255, 5, 3)
+
+            # print('Validation accuracy: %.1f%%' % (100.0 * valid_correct_sum / total_valid_checked))
+            # print('Step %03d  Acc Minibatch: %03.2f%% \t Acc Val: %03.2f%% \t Minibatch loss %f' % (step, miniBatchAccuracy, validationAccuracy, l))
+            logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
+                step, miniBatchAccuracy, validationAccuracy, l))
+
+    # ---- Calculating test accuracy
+    testAccuracy = accuracy_batches(session, tf_test_dataset, test_prediction, dataset.test_dataset,
+                                          dataset.test_labels, test_batch_size, (image_size[0],
+                                                                                 image_size[1]), 255, 5, 3)
+
+    # print('Test accuracy: %.1f%%' % (100.0 * test_correct_sum / total_test_checked))
+    logger.info('Test accuracy: %.1f%%' % testAccuracy)

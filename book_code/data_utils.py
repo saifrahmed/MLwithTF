@@ -446,7 +446,7 @@ def prepare_DR_dataset():
     # and
     # Assuming the image labels are already downloaded at the location '../../datasets/DiabeticRetinopathy/trainLabels.csv
 
-    image_size = (1500, 1500)
+    image_size = (500, 500)
     num_of_classes = 5
 
     # Total 35126 images
