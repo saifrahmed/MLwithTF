@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import pickle
+import os
 from scipy.misc import imsave, imresize
 import tensorflow as tf
 
@@ -20,7 +21,7 @@ num_of_classes = 10
 SEED = 11215
 stddev = 0.05
 stddev_fc = 0.01
-data_showing_step = 50
+data_showing_step = 1000
 num_steps = 100001
 regularization_factor = 5e-4
 
@@ -204,9 +205,6 @@ with graph.as_default():
                          trainable=True, name='biases_fc7'),
     }
 
-    # Add ops to save and restore all the variables.
-    saver = tf.train.Saver()
-
     for weight_key in sorted(weights.keys()):
         _ = tf.histogram_summary(weight_key + '_weights', weights[weight_key])
 
@@ -241,9 +239,6 @@ with tf.Session(graph=graph) as session:
 
     tf.initialize_all_variables().run()
 
-    # Restore variables from disk.
-    saver.restore(session, checkpoints_location)
-
     print("Initialized")
     for step in range(num_steps):
         if 30000 < step < 80000:
@@ -271,9 +266,5 @@ with tf.Session(graph=graph) as session:
             print('Step %03d  Acc-Minibatch: %03.2f%% Acc-Valid: %03.2f%% Minibatch loss: %f Learning Rate: %f' %
                   (step, accuracy(predictions, batch_labels), accuracy(valid_prediction.eval(), valid_labels), l,
                    learning_rate))
-
-        if ((step + 1)% 1000 == 0):
-            # Save the variables to disk.
-            save_path = saver.save(session, checkpoints_location)
 
     print('Acc-Test: %03.2f%%' % accuracy(test_prediction.eval(), test_labels))

@@ -13,7 +13,7 @@ MB = 1024 ** 2
 def download_hook_function(block, block_size, total_size):
     if total_size != -1:
         sys.stdout.write('Downloaded: %3.3fMB of %3.3fMB\r' % (float(block * block_size) / float(MB),
-                                                  float(total_size) / float(MB)))
+                                                               float(total_size) / float(MB)))
     else:
         sys.stdout.write('Downloaded: %3.3fMB of \'unknown size\'\r' % (float(block * block_size) / float(MB)))
 
@@ -61,7 +61,6 @@ def extract_file(input_file, output_dir, FORCE=False):
 
 
 def load_class(folder, image_size, pixel_depth):
-
     image_files = os.listdir(folder)
     num_of_images = len(image_files)
     dataset = np.ndarray(shape=(num_of_images, image_size, image_size),
@@ -115,6 +114,7 @@ def make_pickles(input_folder, output_dir, image_size, image_depth, FORCE=False)
 
     return pickle_files
 
+
 def randomize(dataset, labels):
     permutation = np.random.permutation(labels.shape[0])
     shuffled_dataset = dataset[permutation, :, :]
@@ -131,8 +131,7 @@ def make_arrays(nb_rows, img_size):
     return dataset, labels
 
 
-def merge_datasets(pickle_files, image_size,train_size, valid_size=0):
-
+def merge_datasets(pickle_files, image_size, train_size, valid_size=0):
     num_classes = len(pickle_files)
     valid_dataset, valid_labels = make_arrays(valid_size, image_size)
     train_dataset, train_labels = make_arrays(train_size, image_size)
@@ -259,8 +258,7 @@ def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_bat
 
 
 def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
-                     train_size, valid_size, test_size, output_file_path, FORCE=False):
-
+                    train_size, valid_size, test_size, output_file_path, FORCE=False):
     if os.path.isfile(output_file_path) and not FORCE:
         print('\tPickle file already exists: %s' % output_file_path)
 
@@ -345,9 +343,9 @@ def prepare_not_mnist_dataset():
     num_of_channels = 1
 
     train_file_path = download_file(training_set_url,
-                            os.path.realpath('../../datasets/notMNIST'), train_download_size)
+                                    os.path.realpath('../../datasets/notMNIST'), train_download_size)
     test_file_path = download_file(test_set_url,
-                            os.path.realpath('../../datasets/notMNIST'), test_download_size)
+                                   os.path.realpath('../../datasets/notMNIST'), test_download_size)
 
     train_extracted_folder = extract_file(train_file_path, os.path.realpath('../../datasets/notMNIST/train'))
     test_extracted_folder = extract_file(test_file_path, os.path.realpath('../../datasets/notMNIST/test'))
@@ -363,9 +361,9 @@ def prepare_not_mnist_dataset():
     print('Finished loading testing data')
 
     print('Started pickling final dataset')
-    train_dataset, train_labels, valid_dataset, valid_labels,\
-        test_dataset, test_labels = pickle_whole(train_pickle_files, test_pickle_files, image_size, train_size, valid_size,
-                                test_size, os.path.realpath('../../datasets/notMNIST/notMNIST.pickle'))
+    train_dataset, train_labels, valid_dataset, valid_labels, \
+    test_dataset, test_labels = pickle_whole(train_pickle_files, test_pickle_files, image_size, train_size, valid_size,
+                                             test_size, os.path.realpath('../../datasets/notMNIST/notMNIST.pickle'))
     print('Finished pickling final dataset')
 
     print('Finished preparing notMNIST dataset')
@@ -397,12 +395,12 @@ def prepare_cifar_10_dataset():
     pickle_batch_size = 10000
 
     dataset_path = download_file(cifar_dataset_url,
-                            os.path.realpath('../../datasets/CIFAR-10'), dataset_size)
+                                 os.path.realpath('../../datasets/CIFAR-10'), dataset_size)
 
     dataset_extracted_folder = extract_file(dataset_path, os.path.realpath('../../datasets/CIFAR-10/data'))
 
     train_pickle_files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4',
-                                                     'data_batch_5']
+                          'data_batch_5']
     train_pickle_files = [dataset_extracted_folder + '/' + x for x in train_pickle_files]
 
     test_pickle_files = ['test_batch']
@@ -416,7 +414,6 @@ def prepare_cifar_10_dataset():
                                                                                                   image_depth,
                                                                                                   num_of_channels)
     print('Finished loading CIFAR-10 dataset')
-
 
     print('Started pickling final dataset')
     train_dataset, train_labels, valid_dataset, valid_labels, \
@@ -446,16 +443,17 @@ def prepare_DR_dataset():
     # and
     # Assuming the image labels are already downloaded at the location '../../datasets/DiabeticRetinopathy/trainLabels.csv
 
-    image_size = (500, 500)
+    image_size = (227, 227)
     num_of_classes = 5
 
     # Total 35126 images
     train_size = 30000
-    valid_size = 2000
-    test_size = 3126
+    valid_size = 100  # 2000
+    test_size = 100  # 3126
 
-    image_paths, image_labels = load_classes_from_csv(os.path.realpath('../../datasets/DiabeticRetinopathy/train/{}.jpeg'),
-                                                      os.path.realpath('../../datasets/DiabeticRetinopathy/trainLabels.csv'))
+    image_paths, image_labels = load_classes_from_csv(
+        os.path.realpath('../../datasets/DiabeticRetinopathy/train/{}.jpeg'),
+        os.path.realpath('../../datasets/DiabeticRetinopathy/trainLabels.csv'))
 
     print(image_paths)
     print(image_labels)

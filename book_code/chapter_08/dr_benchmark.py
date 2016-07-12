@@ -23,7 +23,7 @@ conv_layers = 3
 SEED = 11215
 stddev = 0.1
 stddev_fc = 0.005
-data_showing_step = 50
+data_showing_step = 5
 
 log_location = '/tmp/alex_nn_log'
 
@@ -219,7 +219,7 @@ def nn_model(data, weights, biases, TRAIN=False):
         matmul = tf.matmul(reshape, weights['fc6'], name='fc6_matmul')
         bias_add = tf.nn.bias_add(matmul, biases['fc6'], name='fc6_bias_add')
         relu = tf.nn.relu(bias_add, name=scope)
-        if(TRAIN):
+        if (TRAIN):
             relu = tf.nn.dropout(relu, 0.5, seed=SEED, name='dropout_fc6')
 
     with tf.name_scope('FC_Layer_7') as scope:
@@ -251,112 +251,119 @@ valid_batch_size, test_batch_size = get_valid_and_test_batch_size((image_size[0]
 
 graph = tf.Graph()
 with graph.as_default():
-    tf_train_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, image_size[0], image_size[1], 3), name='TRAIN_DATASET')
-    tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
-    tf_valid_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, image_size[0], image_size[1], 3), name='VALID_DATASET')
-    tf_test_dataset = tf.placeholder(tf.float32,
-                                      shape=(batch_size, image_size[0], image_size[1], 3), name='TEST_DATASET')
+    for d in ['/gpu:0', '/gpu:1', '/gpu:2']:
+        with tf.device(d):
+            tf_train_dataset = tf.placeholder(tf.float32,
+                                              shape=(batch_size, image_size[0], image_size[1], 3), name='TRAIN_DATASET')
+            tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_of_classes), name='TRAIN_LABEL')
+            tf_valid_dataset = tf.placeholder(tf.float32,
+                                              shape=(valid_batch_size, image_size[0], image_size[1], 3),
+                                              name='VALID_DATASET')
+            tf_test_dataset = tf.placeholder(tf.float32,
+                                             shape=(test_batch_size, image_size[0], image_size[1], 3),
+                                             name='TEST_DATASET')
 
-    # Variables.
-    weights = {
-        'conv1': tf.Variable(tf.truncated_normal([11, 11, 3, 96], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv2': tf.Variable(tf.truncated_normal([5, 5, 96, 256], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv3': tf.Variable(tf.truncated_normal([3, 3, 256, 384], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv4': tf.Variable(tf.truncated_normal([3, 3, 384, 384], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256], dtype=tf.float32,
-                                                 stddev=stddev, seed=SEED), name='weights'),
-        'fc6': tf.Variable(tf.truncated_normal([50176, 4096], dtype=tf.float32,
-                                               stddev=stddev_fc, seed=SEED), name='weights'),
-        'fc7': tf.Variable(tf.truncated_normal([4096, 4096], dtype=tf.float32,
-                                               stddev=stddev_fc, seed=SEED), name='weights'),
-        'fc8': tf.Variable(tf.truncated_normal([4096, 1000], dtype=tf.float32,
-                                               stddev=stddev, seed=SEED), name='weights'),
-        'fc9': tf.Variable(tf.truncated_normal([1000, num_of_classes], dtype=tf.float32,
-                                               stddev=stddev, seed=SEED), name='weights')
-    }
-    biases = {
-        'conv1': tf.Variable(tf.constant(0.1, shape=[96], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv2': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv3': tf.Variable(tf.constant(0.1, shape=[384], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv4': tf.Variable(tf.constant(0.1, shape=[384], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'conv5': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'fc6': tf.Variable(tf.constant(0.1, shape=[4096], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'fc7': tf.Variable(tf.constant(0.1, shape=[4096], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'fc8': tf.Variable(tf.constant(0.1, shape=[1000], dtype=tf.float32),
-                         trainable=True, name='biases'),
-        'fc9': tf.Variable(tf.constant(0.1, shape=[num_of_classes], dtype=tf.float32),
-                         trainable=True, name='biases')
-    }
+            # Variables.
+            weights = {
+                'conv1': tf.Variable(tf.truncated_normal([11, 11, 3, 96], dtype=tf.float32,
+                                                         stddev=stddev, seed=SEED), name='weights'),
+                'conv2': tf.Variable(tf.truncated_normal([5, 5, 96, 256], dtype=tf.float32,
+                                                         stddev=stddev, seed=SEED), name='weights'),
+                'conv3': tf.Variable(tf.truncated_normal([3, 3, 256, 384], dtype=tf.float32,
+                                                         stddev=stddev, seed=SEED), name='weights'),
+                'conv4': tf.Variable(tf.truncated_normal([3, 3, 384, 384], dtype=tf.float32,
+                                                         stddev=stddev, seed=SEED), name='weights'),
+                'conv5': tf.Variable(tf.truncated_normal([3, 3, 384, 256], dtype=tf.float32,
+                                                         stddev=stddev, seed=SEED), name='weights'),
+                'fc6': tf.Variable(tf.truncated_normal([9216, 4096], dtype=tf.float32,
+                                                       stddev=stddev_fc, seed=SEED), name='weights'),
+                'fc7': tf.Variable(tf.truncated_normal([4096, 4096], dtype=tf.float32,
+                                                       stddev=stddev_fc, seed=SEED), name='weights'),
+                'fc8': tf.Variable(tf.truncated_normal([4096, 1000], dtype=tf.float32,
+                                                       stddev=stddev, seed=SEED), name='weights'),
+                'fc9': tf.Variable(tf.truncated_normal([1000, num_of_classes], dtype=tf.float32,
+                                                       stddev=stddev, seed=SEED), name='weights')
+            }
+            biases = {
+                'conv1': tf.Variable(tf.constant(0.1, shape=[96], dtype=tf.float32),
+                                     trainable=True, name='biases'),
+                'conv2': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
+                                     trainable=True, name='biases'),
+                'conv3': tf.Variable(tf.constant(0.1, shape=[384], dtype=tf.float32),
+                                     trainable=True, name='biases'),
+                'conv4': tf.Variable(tf.constant(0.1, shape=[384], dtype=tf.float32),
+                                     trainable=True, name='biases'),
+                'conv5': tf.Variable(tf.constant(0.1, shape=[256], dtype=tf.float32),
+                                     trainable=True, name='biases'),
+                'fc6': tf.Variable(tf.constant(0.1, shape=[4096], dtype=tf.float32),
+                                   trainable=True, name='biases'),
+                'fc7': tf.Variable(tf.constant(0.1, shape=[4096], dtype=tf.float32),
+                                   trainable=True, name='biases'),
+                'fc8': tf.Variable(tf.constant(0.1, shape=[1000], dtype=tf.float32),
+                                   trainable=True, name='biases'),
+                'fc9': tf.Variable(tf.constant(0.1, shape=[num_of_classes], dtype=tf.float32),
+                                   trainable=True, name='biases')
+            }
 
-    for weight_key in sorted(weights.keys()):
-        _ = tf.histogram_summary(weight_key + '_weights', weights[weight_key])
+            # for weight_key in sorted(weights.keys()):
+            #    _ = tf.histogram_summary(weight_key + '_weights', weights[weight_key])
 
-    for bias_key in sorted(biases.keys()):
-        _ = tf.histogram_summary(bias_key + '_biases', biases[bias_key])
+            # for bias_key in sorted(biases.keys()):
+            #    _ = tf.histogram_summary(bias_key + '_biases', biases[bias_key])
 
-    # Training computation.
-    logits = nn_model(tf_train_dataset, weights, biases, TRAIN=True)
-    loss = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+            # Training computation.
+            logits = nn_model(tf_train_dataset, weights, biases, TRAIN=True)
+            loss = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
-    # L2 regularization for the fully connected parameters.
-    regularizers = (tf.nn.l2_loss(weights['fc6']) + tf.nn.l2_loss(biases['fc6']) +
-                    tf.nn.l2_loss(weights['fc7']) + tf.nn.l2_loss(biases['fc7']) +
-                    tf.nn.l2_loss(weights['fc8']) + tf.nn.l2_loss(biases['fc8']) +
-                    tf.nn.l2_loss(weights['fc9']) + tf.nn.l2_loss(biases['fc9']))
-    # Add the regularization term to the loss.
-    loss += 5e-4 * regularizers
+            # L2 regularization for the fully connected parameters.
+            regularizers = (tf.nn.l2_loss(weights['fc6']) + tf.nn.l2_loss(biases['fc6']) +
+                            tf.nn.l2_loss(weights['fc7']) + tf.nn.l2_loss(biases['fc7']) +
+                            tf.nn.l2_loss(weights['fc8']) + tf.nn.l2_loss(biases['fc8']) +
+                            tf.nn.l2_loss(weights['fc9']) + tf.nn.l2_loss(biases['fc9']))
+            # Add the regularization term to the loss.
+            loss += 5e-4 * regularizers
 
-    _ = tf.scalar_summary('nn_loss', loss)
+            _ = tf.scalar_summary('nn_loss', loss)
 
-    # Optimizer.
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+            # Optimizer.
+            optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
-    # Predictions for the training, validation, and test data.
-    train_prediction = tf.nn.softmax(nn_model(tf_train_dataset, weights, biases, TRAIN=False))
-    valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases, TRAIN=False))
-    test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases, TRAIN=False))
+            # Predictions for the training, validation, and test data.
+            train_prediction = tf.nn.softmax(nn_model(tf_train_dataset, weights, biases, TRAIN=False))
+            valid_prediction = tf.nn.softmax(nn_model(tf_valid_dataset, weights, biases, TRAIN=False))
+            test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases, TRAIN=False))
 
-    skipped_images = 0
+skipped_images = 0
 
-with tf.Session(graph=graph) as session:
+config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True)
+config.gpu_options.allow_growth = True
+
+with tf.Session(graph=graph, config=config) as session:
     # saving graph
-    merged = tf.merge_all_summaries()
-    writer = tf.train.SummaryWriter(log_location, session.graph_def)
+    # merged = tf.merge_all_summaries()
+    # writer = tf.train.SummaryWriter(log_location, session.graph_def)
 
     tf.initialize_all_variables().run()
     logger.info('Session Initialized')
     for step in range(num_steps):
+        sys.stdout.write('Training on batch %d of %d\r' % (step + 1, num_steps))
+        sys.stdout.flush()
+
         offset = (step * batch_size) % (dataset.train_dataset.shape[0] - batch_size)
-        if step % 100 == 0:
-            #logger.info('Loading Batch for step ' + str(step))
-            sys.stdout.write('Loading Batch for step ' + str(step) + '\r')
-            sys.stdout.flush()
+
         batch_data, batch_labels, skipped = load_batch(dataset.train_dataset, dataset.train_labels,
-                                                            offset + skipped_images,
-                                                            batch_size,
-                                                            (image_size[0], image_size[1]),
-                                                            255,
-                                                            5, 3)
+                                                       offset + skipped_images,
+                                                       batch_size,
+                                                       (image_size[0], image_size[1]),
+                                                       255,
+                                                       5, 3)
         skipped_images += skipped
         feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels}
-        _, sum_string, l, predictions = session.run(
-            [optimizer, merged, loss, train_prediction], feed_dict=feed_dict)
-        if (step % data_showing_step == 0):
-            writer.add_summary(sum_string, step)
+        _, l, predictions = session.run(
+            [optimizer, loss, train_prediction], feed_dict=feed_dict)
+        if step % data_showing_step == 0:
+            # writer.add_summary(sum_string, step)
 
             # print('Minibatch loss at step %d: %f' % (step, l))
             # print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
@@ -373,8 +380,8 @@ with tf.Session(graph=graph) as session:
 
     # ---- Calculating test accuracy
     testAccuracy = accuracy_batches(session, tf_test_dataset, test_prediction, dataset.test_dataset,
-                                          dataset.test_labels, test_batch_size, (image_size[0],
-                                                                                 image_size[1]), 255, 5, 3)
+                                    dataset.test_labels, test_batch_size, (image_size[0],
+                                                                           image_size[1]), 255, 5, 3)
 
     # print('Test accuracy: %.1f%%' % (100.0 * test_correct_sum / total_test_checked))
     logger.info('Test accuracy: %.1f%%' % testAccuracy)
