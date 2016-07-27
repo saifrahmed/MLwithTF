@@ -21,7 +21,7 @@ num_of_classes = 10
 SEED = 11215
 stddev = 0.05
 stddev_fc = 0.01
-data_showing_step = 1000
+data_showing_step = 50
 num_steps = 100001
 regularization_factor = 5e-4
 

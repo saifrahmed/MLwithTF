@@ -224,7 +224,7 @@ def load_cifar_10_pickle(pickle_file, image_depth):
     fo = open(pickle_file, 'rb')
     dict = pickle.load(fo)
     fo.close()
-    return ((dict['data'].astype(float) - image_depth / 2) / (image_depth)), dict['labels']
+    return np.array(dict['data']).astype(float), np.array(dict['labels'])
 
 
 def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_batch_size, image_size, image_depth,
@@ -257,7 +257,7 @@ def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_bat
     return all_train_data, all_train_labels, all_test_data, all_test_labels
 
 
-def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
+def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels, image_size, num_of_channels,
                     train_size, valid_size, test_size, output_file_path, FORCE=False):
     if os.path.isfile(output_file_path) and not FORCE:
         print('\tPickle file already exists: %s' % output_file_path)
@@ -277,6 +277,11 @@ def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_la
 
         return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
     else:
+        print('Started reshaping CIFAR-10 dataset')
+        all_train_data = normalize(reshape_linear_fast(all_train_data, image_size, num_of_channels))
+        all_test_data = normalize(reshape_linear_fast(all_test_data, image_size, num_of_channels))
+        print('Finished reshaping CIFAR-10 dataset')
+
         train_dataset = all_train_data[0:train_size]
         train_labels = all_train_labels[0:train_size]
         valid_dataset = all_train_data[train_size:train_size + valid_size]
@@ -321,6 +326,20 @@ def load_classes_from_csv(images_base_path, csv_location):
             labels[row_index] = int(row[fieldnames[1]])
 
         return image_paths, labels
+
+
+def reshape_linear_fast(data, shape, channels):
+    linear_pixels = shape**2
+    sequence = np.ndarray(shape=(linear_pixels*channels), dtype=np.int32)
+    for i in range(linear_pixels):
+        start = i * (channels)
+        end = (i+1) * (channels)
+        sequence[start:end] = range(i, linear_pixels*channels, linear_pixels)
+    return data[:, sequence]
+
+
+def normalize(data):
+    return (data - 255/2) / 255
 
 
 def prepare_not_mnist_dataset():
@@ -418,8 +437,9 @@ def prepare_cifar_10_dataset():
     print('Started pickling final dataset')
     train_dataset, train_labels, valid_dataset, valid_labels, \
     test_dataset, test_labels = pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
+                                                image_size, num_of_channels,
                                                 train_size, valid_size, test_size,
-                                                os.path.realpath('../../datasets/CIFAR-10/CIFAR-10.pickle'), False)
+                                                os.path.realpath('../../datasets/CIFAR-10/CIFAR-10.pickle'), True)
     print('Finished pickling final dataset')
 
     print('Finished preparing CIFAR-10 dataset')

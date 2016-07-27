@@ -1,11 +1,11 @@
-import sys, os
+import os
+import sys
+
 import tensorflow as tf
 
 sys.path.append(os.path.realpath('../..'))
 from book_code.data_utils import *
 from book_code.logmanager import *
-import math
-import getopt
 from scipy.misc import imresize
 
 logger.propagate = False
@@ -21,8 +21,8 @@ dropout_prob = 0.8
 
 conv_layers = 3
 SEED = 11215
-stddev = 0.1
-stddev_fc = 0.005
+stddev = 0.1/50.0
+stddev_fc = 0.005/50.0
 data_showing_step = 5
 
 log_location = '/tmp/alex_nn_log'
@@ -94,9 +94,39 @@ def get_valid_and_test_batch_size(image_shape, safety_percentage, train_batch_si
     return valid_batch_size, test_batch_size
 
 
-def preprocess_images(images, image_shape, channels, pixel_depth):
-    images = imresize(images, (image_shape[0], image_shape[1], channels), interp='bicubic')
-    return (images - pixel_depth / 2) / pixel_depth
+def preprocess_images(image_path, reduced_image_size, num_channels, pixel_depth):
+
+    original_image = ndimage.imread(image_path)
+    image_shape = original_image.shape
+
+    if image_shape[0] == image_shape[1]:
+        processed_image = original_image
+    elif image_shape[0] > image_shape[1]:
+        diff = image_shape[0] - image_shape[1]
+        if diff % 2 == 0:
+            padding = int(diff / 2)
+            npad = ((0,0), (padding,padding), (0,0))
+            processed_image = np.pad(original_image, pad_width=npad, mode='constant', constant_values=0)
+        else:
+            padding = int(diff // 2)
+            npad = ((0,0), (padding+1,padding), (0,0))
+            processed_image = np.pad(original_image, pad_width=npad, mode='constant', constant_values=0)
+    else:
+        diff = image_shape[1] - image_shape[0]
+        if diff % 2 == 0:
+            padding = int(diff / 2)
+            npad = ((padding,padding), (0,0), (0,0))
+            processed_image = np.pad(original_image, pad_width=npad, mode='constant', constant_values=0)
+        else:
+            padding = int(diff // 2)
+            npad = ((padding+1,padding), (0,0), (0,0))
+            processed_image = np.pad(original_image, pad_width=npad, mode='constant', constant_values=0)
+
+    processed_image = imresize(processed_image, (reduced_image_size[0], reduced_image_size[1], num_channels),
+                               interp='bicubic').astype(float)
+    processed_image = (processed_image - 255 / 2) / 255
+
+    return processed_image
 
 
 def load_batch(dataset_file_paths, labels, offset, batch_size, image_shape, pixel_depth, num_labels,
