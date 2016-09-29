@@ -1,11 +1,13 @@
-import os, sys, tarfile
+import csv
+import pickle
+import tarfile
+import zipfile as z
+from scipy import ndimage
+from scipy.misc import imresize, imsave
+
 from six.moves.urllib.request import urlretrieve
 
-import numpy as np
-from scipy import ndimage
-
-import pickle
-import zipfile as z
+from book_code.chapter_08.data.build_image_data import *
 
 MB = 1024 ** 2
 
@@ -13,7 +15,7 @@ MB = 1024 ** 2
 def download_hook_function(block, block_size, total_size):
     if total_size != -1:
         sys.stdout.write('Downloaded: %3.3fMB of %3.3fMB\r' % (float(block * block_size) / float(MB),
-                                                  float(total_size) / float(MB)))
+                                                               float(total_size) / float(MB)))
     else:
         sys.stdout.write('Downloaded: %3.3fMB of \'unknown size\'\r' % (float(block * block_size) / float(MB)))
 
@@ -61,7 +63,6 @@ def extract_file(input_file, output_dir, FORCE=False):
 
 
 def load_class(folder, image_size, pixel_depth):
-
     image_files = os.listdir(folder)
     num_of_images = len(image_files)
     dataset = np.ndarray(shape=(num_of_images, image_size, image_size),
@@ -115,6 +116,7 @@ def make_pickles(input_folder, output_dir, image_size, image_depth, FORCE=False)
 
     return pickle_files
 
+
 def randomize(dataset, labels):
     permutation = np.random.permutation(labels.shape[0])
     shuffled_dataset = dataset[permutation, :, :]
@@ -131,8 +133,7 @@ def make_arrays(nb_rows, img_size):
     return dataset, labels
 
 
-def merge_datasets(pickle_files, image_size,train_size, valid_size=0):
-
+def merge_datasets(pickle_files, image_size, train_size, valid_size=0):
     num_classes = len(pickle_files)
     valid_dataset, valid_labels = make_arrays(valid_size, image_size)
     train_dataset, train_labels = make_arrays(train_size, image_size)
@@ -259,8 +260,7 @@ def load_cifar_10_from_pickles(train_pickle_files, test_pickle_files, pickle_bat
 
 
 def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_labels,
-                     train_size, valid_size, test_size, output_file_path, FORCE=False):
-
+                    train_size, valid_size, test_size, output_file_path, FORCE=False):
     if os.path.isfile(output_file_path) and not FORCE:
         print('\tPickle file already exists: %s' % output_file_path)
 
@@ -323,8 +323,11 @@ def check_file_status(file_path, expected_size, error_message, close=True):
 
 
 def check_folder_status(folder_path, expected_num_of_files, success_message, error_message, close=True):
-    num_of_files_found = [filename for filename in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path,
-                                                                                                          filename))]
+    num_of_files_found = 0
+
+    for root, dirs, files in os.walk(folder_path):
+        num_of_files_found += len(files)
+
     if num_of_files_found == expected_num_of_files:
         print(success_message)
         return True
@@ -334,6 +337,30 @@ def check_folder_status(folder_path, expected_num_of_files, success_message, err
             exit(-1)
         else:
             return False
+
+
+def crop_black_borders(image, threshold=0):
+    """Crops any edges below or equal to threshold
+
+    Crops blank image to 1x1.
+
+    Returns cropped image.
+
+    """
+    if len(image.shape) == 3:
+        flatImage = np.max(image, 2)
+    else:
+        flatImage = image
+    assert len(flatImage.shape) == 2
+
+    rows = np.where(np.max(flatImage, 0) > threshold)[0]
+    if rows.size:
+        cols = np.where(np.max(flatImage, 1) > threshold)[0]
+        image = image[cols[0]: cols[-1] + 1, rows[0]: rows[-1] + 1]
+    else:
+        image = image[:1, :1]
+
+    return image
 
 
 def prepare_not_mnist_dataset():
@@ -356,9 +383,9 @@ def prepare_not_mnist_dataset():
     num_of_channels = 1
 
     train_file_path = download_file(training_set_url,
-                            os.path.realpath('../../datasets/notMNIST'), train_download_size)
+                                    os.path.realpath('../../datasets/notMNIST'), train_download_size)
     test_file_path = download_file(test_set_url,
-                            os.path.realpath('../../datasets/notMNIST'), test_download_size)
+                                   os.path.realpath('../../datasets/notMNIST'), test_download_size)
 
     train_extracted_folder = extract_file(train_file_path, os.path.realpath('../../datasets/notMNIST/train'))
     test_extracted_folder = extract_file(test_file_path, os.path.realpath('../../datasets/notMNIST/test'))
@@ -374,9 +401,9 @@ def prepare_not_mnist_dataset():
     print('Finished loading testing data')
 
     print('Started pickling final dataset')
-    train_dataset, train_labels, valid_dataset, valid_labels,\
-        test_dataset, test_labels = pickle_whole(train_pickle_files, test_pickle_files, image_size, train_size, valid_size,
-                                test_size, os.path.realpath('../../datasets/notMNIST/notMNIST.pickle'))
+    train_dataset, train_labels, valid_dataset, valid_labels, \
+    test_dataset, test_labels = pickle_whole(train_pickle_files, test_pickle_files, image_size, train_size, valid_size,
+                                             test_size, os.path.realpath('../../datasets/notMNIST/notMNIST.pickle'))
     print('Finished pickling final dataset')
 
     print('Finished preparing notMNIST dataset')
@@ -408,12 +435,12 @@ def prepare_cifar_10_dataset():
     pickle_batch_size = 10000
 
     dataset_path = download_file(cifar_dataset_url,
-                            os.path.realpath('../../datasets/CIFAR-10'), dataset_size)
+                                 os.path.realpath('../../datasets/CIFAR-10'), dataset_size)
 
     dataset_extracted_folder = extract_file(dataset_path, os.path.realpath('../../datasets/CIFAR-10/data'))
 
     train_pickle_files = ['data_batch_1', 'data_batch_2', 'data_batch_3', 'data_batch_4',
-                                                     'data_batch_5']
+                          'data_batch_5']
     train_pickle_files = [dataset_extracted_folder + '/' + x for x in train_pickle_files]
 
     test_pickle_files = ['test_batch']
@@ -427,7 +454,6 @@ def prepare_cifar_10_dataset():
                                                                                                   image_depth,
                                                                                                   num_of_channels)
     print('Finished loading CIFAR-10 dataset')
-
 
     print('Started pickling final dataset')
     train_dataset, train_labels, valid_dataset, valid_labels, \
@@ -451,18 +477,29 @@ def prepare_cifar_10_dataset():
 
 
 def prepare_dr_dataset(save_space=False):
+    num_of_processing_threads = 16
+
+    # dataset_spread = [25810, 2443, 5292, 873, 708] # spreading of dataset among labels (0 to 4)
 
     dr_dataset_base_path = os.path.realpath('../../datasets/DR')
 
-    train_protofiles_folder = os.path.join(dr_dataset_base_path, "train_protofiles")
-    valid_protofiles_folder = os.path.join(dr_dataset_base_path, "valid_protofiles")
+    build_proto_files_script_path = os.path.realpath('data/build_image_data.py')
+    protofiles_folder = os.path.join(dr_dataset_base_path, "protofiles")
+    num_of_train_proto_files = 128
+    num_of_valid_proto_files = 16
+    unique_labels_file_path = os.path.join(dr_dataset_base_path, "unique_labels_file.txt")
 
     processed_images_folder = os.path.join(dr_dataset_base_path, "processed_images")
-    num_of_train_images = 30000
-    num_of_validation_images = 5000
+    num_of_processed_images = 35126
+
+    train_processed_images_folder = os.path.join(processed_images_folder, "train")
+    validation_processed_images_folder = os.path.join(processed_images_folder, "validation")
+
+    num_of_training_images = 30000
+    num_of_validation_images = 5126
 
     raw_images_folder = os.path.join(dr_dataset_base_path, "train")
-    num_of_raw_images = 35000
+    num_of_raw_images = 35126
 
     main_zip_file = os.path.join(dr_dataset_base_path, "train.zip")
     main_zip_file_size = 34988445506
@@ -515,7 +552,7 @@ def prepare_dr_dataset(save_space=False):
 
         return status
 
-    def extract_training_files():
+    def extract_raw_training_files():
 
         print("\nExtracting the concatenated training file")
         with z.ZipFile(main_zip_file, "r") as zip_ref:
@@ -523,31 +560,208 @@ def prepare_dr_dataset(save_space=False):
         print("Done!")
 
         print("\nChecking integrity of extracted raw files")
-        return check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
+        status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
                                    "Couldn't find all of the extracted raw images")
 
-    if os.path.exists(main_zip_file):
-        print("\nFound concatenated training file: {}".format(main_zip_file))
-        status = check_file_status(main_zip_file, main_zip_file_size,
-                                   "Concatenation of training zip files was unsuccessful. Trying again...", False)
+        if status and save_space:
+            os.remove(main_zip_file)
+
+        return status
+
+    def extract_labels_file():
+
+        print("\nExtracting the training labels file")
+        with z.ZipFile(train_labels_zip_path, "r") as zip_ref:
+            zip_ref.extractall(dr_dataset_base_path)
+        print("Done")
+
+        print("\nChecking integrity of training labels csv file")
+        status = check_file_status(train_labels_csv_path, train_labels_csv_size,
+                                   "The training labels file seems to be corrupted")
+        print("Done!")
+
+        return status
+
+    def process_images_batch(thread_index, files, labels, subset):
+
+        num_of_files = len(files)
+
+        for index, file_and_label in enumerate(zip(files, labels)):
+            file = file_and_label[0] + '.jpeg'
+            label = file_and_label[1]
+
+            input_file = os.path.join(raw_images_folder, file)
+            output_file = os.path.join(processed_images_folder, subset, str(label), file)
+
+            image = ndimage.imread(input_file)
+            cropped_image = crop_black_borders(image, 10)
+            resized_cropped_image = imresize(cropped_image, (299, 299, 3), interp="bicubic")
+            imsave(output_file, resized_cropped_image)
+
+            if index % 10 == 0:
+                print("(Thread {}): Files processed {} out of {}".format(thread_index, index, num_of_files))
+
+    def process_images(files, labels, subset):
+
+        # Break all images into batches with a [ranges[i][0], ranges[i][1]].
+        spacing = np.linspace(0, len(files), num_of_processing_threads + 1).astype(np.int)
+        ranges = []
+        for i in xrange(len(spacing) - 1):
+            ranges.append([spacing[i], spacing[i + 1]])
+
+        # Create a mechanism for monitoring when all threads are finished.
+        coord = tf.train.Coordinator()
+
+        threads = []
+        for thread_index in xrange(len(ranges)):
+            args = (thread_index, files[ranges[thread_index][0]:ranges[thread_index][1]],
+                    labels[ranges[thread_index][0]:ranges[thread_index][1]],
+                    subset)
+            t = threading.Thread(target=process_images_batch, args=args)
+            t.start()
+            threads.append(t)
+
+        # Wait for all the threads to terminate.
+        coord.join(threads)
+
+    def process_training_and_validation_images():
+        train_files = []
+        train_labels = []
+
+        validation_files = []
+        validation_labels = []
+
+        with open(train_labels_csv_path) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for index, row in enumerate(reader):
+                if index < num_of_training_images:
+                    train_files.extend([row['image'].strip()])
+                    train_labels.extend([int(row['level'].strip())])
+                else:
+                    validation_files.extend([row['image'].strip()])
+                    validation_labels.extend([int(row['level'].strip())])
+
+        if not os.path.isdir(processed_images_folder):
+            os.mkdir(processed_images_folder)
+
+        if not os.path.isdir(train_processed_images_folder):
+            os.mkdir(train_processed_images_folder)
+
+        if not os.path.isdir(validation_processed_images_folder):
+            os.mkdir(validation_processed_images_folder)
+
+        for directory_index in range(5):
+            train_directory_path = os.path.join(train_processed_images_folder, str(directory_index))
+            valid_directory_path = os.path.join(validation_processed_images_folder, str(directory_index))
+
+            if not os.path.isdir(train_directory_path):
+                os.mkdir(train_directory_path)
+
+            if not os.path.isdir(valid_directory_path):
+                os.mkdir(valid_directory_path)
+
+        print("Processing training files...")
+        process_images(train_files, train_labels, "train")
+        print("Done!")
+
+        print("Processing validation files...")
+        process_images(validation_files, validation_labels, "validation")
+        print("Done!")
+
+        print("Making unique labels file...")
+        with open(unique_labels_file_path, 'w') as unique_labels_file:
+            unique_labels = ""
+            for index in range(5):
+                unique_labels += "{}\n".format(index)
+            unique_labels_file.write(unique_labels)
+
+        status = check_folder_status(processed_images_folder, num_of_processed_images,
+                                     "All processed images are present in place",
+                                     "Couldn't complete the image processing of training and validation files.")
+
+        return status
+
+    def make_training_and_validation_proto_files():
+
+        if not os.path.isdir(protofiles_folder):
+            os.mkdir(protofiles_folder)
+
+        print("Preparing the training and validation proto files...")
+        command = "python {} " \
+                  "--train_directory={} " \
+                  "--validation_directory={} " \
+                  "--output_directory={} " \
+                  "--train_shards={} " \
+                  "--validation_shards={} " \
+                  "--num_threads={} " \
+                  "--labels_file={}" \
+                  .format(build_proto_files_script_path,
+                          train_processed_images_folder,
+                          validation_processed_images_folder,
+                          protofiles_folder,
+                          num_of_train_proto_files,
+                          num_of_valid_proto_files,
+                          num_of_processing_threads,
+                          unique_labels_file_path)
+
+        print("Command --> {}".format(command))
+        os.system(command)
+        print("Done!")
+
+        status = check_folder_status(protofiles_folder, num_of_train_proto_files + num_of_valid_proto_files,
+                                     "All of the training and validation protofiles are present in place",
+                                     "Couldn't complete the preparation of training and validation proto files.")
+
+        return status
+
+    status = os.path.isdir(processed_images_folder)
+
+    if status:
+        print("\nFound processed images folder: {}".format(processed_images_folder))
+        status = check_folder_status(processed_images_folder, num_of_processed_images,
+                                     "All processed images are present in place",
+                                     "Couldn't find all of the processed images. Trying again...", False)
+
         if not status:
-            status = prepare_concatenated_zip_file()
 
-        if status:
-            status = extract_training_files()
-    else:
-        status = prepare_concatenated_zip_file()
+            status = os.path.isdir(raw_images_folder)
 
-        if status:
-            status = extract_training_files()
+            if status:
+                print("\nFound raw images folder: {}".format(raw_images_folder))
+                status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
+                                             "Couldn't find all of the extracted raw images. Trying again...", False)
 
+                if not status:
 
-    print("\nExtracting the training labels file")
-    # Todo: write code for extracting the training labels file
-    print("Done")
+                    status = os.path.exists(main_zip_file)
 
-    print("\nChecking integrity of training labels csv file")
-    check_file_status(train_labels_csv_path, train_labels_csv_size, "The training labels file seems to be corrupted")
-    print("Done!")
+                    if status:
+                        print("\nFound concatenated training file: {}".format(main_zip_file))
+                        status = check_file_status(main_zip_file, main_zip_file_size,
+                                                   "Concatenation of training zip files was unsuccessful. Trying again...",
+                                                   False)
+
+                        if not status:
+                            status = prepare_concatenated_zip_file()
+
+                        if status:
+                            status = extract_raw_training_files()
+
+                        if status:
+                            status = extract_labels_file()
+
+                        if status:
+                            process_training_and_validation_images()
+
+                else:
+                    status = extract_labels_file()
+
+                    if status:
+                        process_training_and_validation_images()
+
+        else:
+
+            make_training_and_validation_proto_files()
+
 
     return
