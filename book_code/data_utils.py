@@ -5,6 +5,7 @@ import numpy as np
 from scipy import ndimage
 
 import pickle
+import zipfile as z
 
 MB = 1024 ** 2
 
@@ -307,6 +308,34 @@ def pickle_cifar_10(all_train_data, all_train_labels, all_test_data, all_test_la
     return train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels
 
 
+def check_file_status(file_path, expected_size, error_message, close=True):
+    file_size = os.stat(file_path).st_size
+    if file_size == expected_size:
+        print("File status ({}): OK".format(file_path))
+        return True
+    else:
+        print("File status ({}): CORRUPTED. Expected size: {}, found: {}".format(file_path, expected_size, file_size))
+        print(error_message)
+        if close:
+            exit(-1)
+        else:
+            return False
+
+
+def check_folder_status(folder_path, expected_num_of_files, success_message, error_message, close=True):
+    num_of_files_found = [filename for filename in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path,
+                                                                                                          filename))]
+    if num_of_files_found == expected_num_of_files:
+        print(success_message)
+        return True
+    else:
+        print(error_message)
+        if close:
+            exit(-1)
+        else:
+            return False
+
+
 def prepare_not_mnist_dataset():
     print('Started preparing notMNIST dataset')
 
@@ -419,3 +448,106 @@ def prepare_cifar_10_dataset():
     cifar_10.test_labels = test_labels
 
     return cifar_10, image_size, num_of_classes, num_of_channels
+
+
+def prepare_dr_dataset(save_space=False):
+
+    dr_dataset_base_path = os.path.realpath('../../datasets/DR')
+
+    train_protofiles_folder = os.path.join(dr_dataset_base_path, "train_protofiles")
+    valid_protofiles_folder = os.path.join(dr_dataset_base_path, "valid_protofiles")
+
+    processed_images_folder = os.path.join(dr_dataset_base_path, "processed_images")
+    num_of_train_images = 30000
+    num_of_validation_images = 5000
+
+    raw_images_folder = os.path.join(dr_dataset_base_path, "train")
+    num_of_raw_images = 35000
+
+    main_zip_file = os.path.join(dr_dataset_base_path, "train.zip")
+    main_zip_file_size = 34988445506
+
+    zip_files = ["train.zip.001", "train.zip.002", "train.zip.003", "train.zip.004", "train.zip.005"]
+    zip_files_expected_size = [8388608000, 8388608000, 8388608000, 8388608000, 1434013506]
+    zip_files_full_path = [os.path.join(dr_dataset_base_path, filename) for filename in zip_files]
+
+    train_labels_zip_path = os.path.join(dr_dataset_base_path, "trainLabels.csv.zip")
+    train_labels_zip_size = 71069
+    train_labels_csv_path = os.path.join(dr_dataset_base_path, "trainLabels.csv")
+    train_labels_csv_size = 465317
+
+    def prepare_concatenated_zip_file():
+
+        print("\nChecking integrity of training files")
+
+        for zip_file_full_path_and_expected_size in zip(zip_files_full_path, zip_files_expected_size):
+            zip_file_full_path = zip_file_full_path_and_expected_size[0]
+            zip_file_expected_size = zip_file_full_path_and_expected_size[1]
+
+            check_file_status(zip_file_full_path, zip_file_expected_size,
+                              "Please download the train dataset from kaggle: {}"
+                              .format("https://www.kaggle.com/c/diabetic-retinopathy-detection/data"))
+
+        print("All training files are okay")
+
+        print("\nChecking integrity of labels zip file")
+        check_file_status(train_labels_zip_path, train_labels_zip_size,
+                          "Please download the train labels from kaggle: {}"
+                          .format("https://www.kaggle.com/c/diabetic-retinopathy-detection/data"))
+
+        print("\nConcatenating the training files into a single zip file")
+        print("...")
+
+        with open(main_zip_file, "w") as main_zip_file_handle:
+            num_of_zip_files = len(zip_files_full_path)
+            for index, zip_file_full_path in enumerate(zip_files_full_path):
+                with open(zip_file_full_path, 'r') as zip_file_handle:
+                    main_zip_file_handle.write(zip_file_handle.read())
+                    print("{} of {} files concatenated".format(index + 1, num_of_zip_files))
+        print("Done!")
+
+        print("\nChecking integrity of the concatenated zip file")
+        status = check_file_status(main_zip_file, main_zip_file_size, "Training files concatenation unsuccessful")
+
+        if status and save_space:
+            for zip_file_full_path in zip_files_full_path:
+                os.remove(zip_file_full_path)
+
+        return status
+
+    def extract_training_files():
+
+        print("\nExtracting the concatenated training file")
+        with z.ZipFile(main_zip_file, "r") as zip_ref:
+            zip_ref.extractall(dr_dataset_base_path)
+        print("Done!")
+
+        print("\nChecking integrity of extracted raw files")
+        return check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
+                                   "Couldn't find all of the extracted raw images")
+
+    if os.path.exists(main_zip_file):
+        print("\nFound concatenated training file: {}".format(main_zip_file))
+        status = check_file_status(main_zip_file, main_zip_file_size,
+                                   "Concatenation of training zip files was unsuccessful. Trying again...", False)
+        if not status:
+            status = prepare_concatenated_zip_file()
+
+        if status:
+            status = extract_training_files()
+    else:
+        status = prepare_concatenated_zip_file()
+
+        if status:
+            status = extract_training_files()
+
+
+    print("\nExtracting the training labels file")
+    # Todo: write code for extracting the training labels file
+    print("Done")
+
+    print("\nChecking integrity of training labels csv file")
+    check_file_status(train_labels_csv_path, train_labels_csv_size, "The training labels file seems to be corrupted")
+    print("Done!")
+
+    return
