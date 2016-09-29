@@ -12,34 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""A binary to train Inception on the ImageNet data set.
+"""Small library that points to the ImageNet data set.
 """
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys, os
-sys.path.append(os.path.realpath('../..'))
-from book_code.data_utils import *
-
-import tensorflow as tf
-
-from book_code.chapter_08 import inception_train
-from book_code.chapter_08.dr_data import DRData
-
-FLAGS = tf.app.flags.FLAGS
 
 
-
-def main(_):
-  prepare_dr_dataset(save_space=True)
-  dataset = DRData(subset=FLAGS.subset)
-  assert dataset.data_files()
-  if tf.gfile.Exists(FLAGS.train_dir):
-    tf.gfile.DeleteRecursively(FLAGS.train_dir)
-  tf.gfile.MakeDirs(FLAGS.train_dir)
-  inception_train.train(dataset)
+from book_code.chapter_08.dataset import Dataset
 
 
-if __name__ == '__main__':
-  tf.app.run()
+class DRData(Dataset):
+  """Diabetic Retinopathy data set."""
+
+  def __init__(self, subset):
+    super(DRData, self).__init__('DR', subset)
+
+  def num_classes(self):
+    """Returns the number of classes in the data set."""
+    return 5
+
+  def num_examples_per_epoch(self):
+    """Returns the number of examples in the data set."""
+    if self.subset == 'train':
+      return 30000
+    if self.subset == 'validation':
+      return 5126
+
+  def download_message(self):
+    """Instruction to download and extract the tarball from Flowers website."""
+
+    print('Failed to find any DR %s files'% self.subset)
+    print('')

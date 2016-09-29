@@ -714,54 +714,69 @@ def prepare_dr_dataset(save_space=False):
 
         return status
 
-    status = os.path.isdir(processed_images_folder)
+    status = os.path.isdir(protofiles_folder)
 
     if status:
         print("\nFound processed images folder: {}".format(processed_images_folder))
-        status = check_folder_status(processed_images_folder, num_of_processed_images,
-                                     "All processed images are present in place",
-                                     "Couldn't find all of the processed images. Trying again...", False)
+        status = check_folder_status(protofiles_folder, num_of_train_proto_files + num_of_valid_proto_files,
+                                     "All of the training and validation protofiles are present in place",
+                                     "Couldn't complete the preparation of training and validation proto files."
+                                     "Trying again...")
 
         if not status:
 
-            status = os.path.isdir(raw_images_folder)
+            status = os.path.isdir(processed_images_folder)
 
             if status:
-                print("\nFound raw images folder: {}".format(raw_images_folder))
-                status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
-                                             "Couldn't find all of the extracted raw images. Trying again...", False)
+                print("\nFound processed images folder: {}".format(processed_images_folder))
+                status = check_folder_status(processed_images_folder, num_of_processed_images,
+                                             "All processed images are present in place",
+                                             "Couldn't find all of the processed images. Trying again...", False)
 
                 if not status:
 
-                    status = os.path.exists(main_zip_file)
+                    status = os.path.isdir(raw_images_folder)
 
                     if status:
-                        print("\nFound concatenated training file: {}".format(main_zip_file))
-                        status = check_file_status(main_zip_file, main_zip_file_size,
-                                                   "Concatenation of training zip files was unsuccessful. Trying again...",
-                                                   False)
+                        print("\nFound raw images folder: {}".format(raw_images_folder))
+                        status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
+                                                     "Couldn't find all of the extracted raw images. Trying again...", False)
 
                         if not status:
-                            status = prepare_concatenated_zip_file()
 
-                        if status:
-                            status = extract_raw_training_files()
+                            status = os.path.exists(main_zip_file)
 
-                        if status:
+                            if status:
+                                print("\nFound concatenated training file: {}".format(main_zip_file))
+                                status = check_file_status(main_zip_file, main_zip_file_size,
+                                                           "Concatenation of training zip files was unsuccessful. "
+                                                           "Trying again...",
+                                                           False)
+
+                                if not status:
+                                    status = prepare_concatenated_zip_file()
+
+                                if status:
+                                    status = extract_raw_training_files()
+
+                                if status:
+                                    status = extract_labels_file()
+
+                                if status:
+                                    process_training_and_validation_images()
+
+                        else:
                             status = extract_labels_file()
 
-                        if status:
-                            process_training_and_validation_images()
+                            if status:
+                                process_training_and_validation_images()
 
                 else:
-                    status = extract_labels_file()
 
-                    if status:
-                        process_training_and_validation_images()
+                    make_training_and_validation_proto_files()
 
-        else:
+    else:
 
-            make_training_and_validation_proto_files()
-
+        make_training_and_validation_proto_files()
 
     return
