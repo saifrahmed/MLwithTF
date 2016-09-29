@@ -24,7 +24,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+import os, sys
+sys.path.append(os.path.realpath('../..'))
+from book_code.data_utils import *
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import tensorflow as tf
@@ -36,6 +38,7 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def main(unused_argv=None):
+    prepare_dr_dataset(save_space=True)
     dataset = DRData(subset=FLAGS.subset)
     assert dataset.data_files()
     if tf.gfile.Exists(FLAGS.eval_dir):
