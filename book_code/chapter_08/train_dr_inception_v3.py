@@ -19,8 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import sys, os
+
 sys.path.append(os.path.realpath('../..'))
 from book_code.data_utils import *
+
+# The gpus to use for this process
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7,8"
 
 import tensorflow as tf
 
@@ -30,16 +34,15 @@ from book_code.chapter_08.dr_data import DRData
 FLAGS = tf.app.flags.FLAGS
 
 
-
 def main(_):
-  prepare_dr_dataset(save_space=True)
-  dataset = DRData(subset=FLAGS.subset)
-  assert dataset.data_files()
-  if tf.gfile.Exists(FLAGS.train_dir):
-    tf.gfile.DeleteRecursively(FLAGS.train_dir)
-  tf.gfile.MakeDirs(FLAGS.train_dir)
-  inception_train.train(dataset)
+    prepare_dr_dataset(save_space=False)
+    dataset = DRData(subset=FLAGS.subset)
+    assert dataset.data_files()
+    if tf.gfile.Exists(FLAGS.train_dir):
+        tf.gfile.DeleteRecursively(FLAGS.train_dir)
+    tf.gfile.MakeDirs(FLAGS.train_dir)
+    inception_train.train(dataset)
 
 
 if __name__ == '__main__':
-  tf.app.run()
+    tf.app.run()

@@ -27,7 +27,7 @@ from __future__ import print_function
 import os, sys
 sys.path.append(os.path.realpath('../..'))
 from book_code.data_utils import *
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "9"
 
 import tensorflow as tf
 
@@ -38,7 +38,7 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def main(unused_argv=None):
-    prepare_dr_dataset(save_space=True)
+    prepare_dr_dataset(save_space=False)
     dataset = DRData(subset=FLAGS.subset)
     assert dataset.data_files()
     if tf.gfile.Exists(FLAGS.eval_dir):

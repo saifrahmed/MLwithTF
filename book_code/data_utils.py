@@ -54,9 +54,9 @@ def extract_file(input_file, output_dir, FORCE=False):
     else:
         tar = tarfile.open(input_file)
         sys.stdout.flush()
-        print('Started extracting %s to %s' % (input_file, output_dir))
+        print('Started extracting:\n%s\nto:\n%s' % (input_file, output_dir))
         tar.extractall(output_dir)
-        print('Finished extracting %s to %s' % (input_file, output_dir))
+        print('Finished extracting:\n%s\nto:\n%s' % (input_file, output_dir))
         tar.close()
         directories = [x for x in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, x))]
         return output_dir + "/" + directories[0]
@@ -513,6 +513,26 @@ def prepare_dr_dataset(save_space=False):
     train_labels_csv_path = os.path.join(dr_dataset_base_path, "trainLabels.csv")
     train_labels_csv_size = 465317
 
+    checkpoint_tar_file_url = 'http://download.tensorflow.org/models/image/imagenet/inception-v3-2016-03-01.tar.gz'
+    checkpoint_tar_file_directory = os.path.realpath('../../datasets/DR/checkpoints/pre_trained')
+    checkpoint_tar_expected_size = 399307177
+    checkpoint_tar_input_file = os.path.realpath('../../datasets/DR/checkpoints/pre_trained/inception-v3-2016-03-01.tar.gz')
+    checkpoint_file_path = os.path.realpath('../../datasets/DR/checkpoints/pre_trained/inception-v3/model.ckpt-157585')
+    checkpoint_file_expected_size = 434903494
+
+    def make_required_directories():
+
+        directories = [os.path.realpath('../../datasets'),
+                       os.path.realpath('../../datasets/DR'),
+                       os.path.realpath('../../datasets/DR/checkpoints'),
+                       os.path.realpath('../../datasets/DR/checkpoints/pre_trained')]
+
+        for directory in directories:
+            if not os.path.isdir(directory):
+                os.mkdir(directory)
+
+        return
+
     def prepare_concatenated_zip_file():
 
         print("\nChecking integrity of training files")
@@ -561,7 +581,7 @@ def prepare_dr_dataset(save_space=False):
 
         print("\nChecking integrity of extracted raw files")
         status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
-                                   "Couldn't find all of the extracted raw images")
+                                     "Couldn't find all of the extracted raw images")
 
         if status and save_space:
             os.remove(main_zip_file)
@@ -695,14 +715,14 @@ def prepare_dr_dataset(save_space=False):
                   "--validation_shards={} " \
                   "--num_threads={} " \
                   "--labels_file={}" \
-                  .format(build_proto_files_script_path,
-                          train_processed_images_folder,
-                          validation_processed_images_folder,
-                          protofiles_folder,
-                          num_of_train_proto_files,
-                          num_of_valid_proto_files,
-                          num_of_processing_threads,
-                          unique_labels_file_path)
+            .format(build_proto_files_script_path,
+                    train_processed_images_folder,
+                    validation_processed_images_folder,
+                    protofiles_folder,
+                    num_of_train_proto_files,
+                    num_of_valid_proto_files,
+                    num_of_processing_threads,
+                    unique_labels_file_path)
 
         print("Command --> {}".format(command))
         os.system(command)
@@ -714,6 +734,29 @@ def prepare_dr_dataset(save_space=False):
 
         return status
 
+    def download_and_extract_checkpoint_file():
+
+        download_file(checkpoint_tar_file_url, checkpoint_tar_file_directory, checkpoint_tar_expected_size, True)
+        print("\nExtracting the checkpoint file")
+        extract_file(checkpoint_tar_input_file, checkpoint_tar_file_directory, True)
+        print("Done")
+
+        print("\nChecking integrity of checkpoint file")
+        status = check_file_status(checkpoint_file_path, checkpoint_file_expected_size,
+                                   "The checkpoint file seems to be corrupted")
+        print("Done!")
+
+        return status
+
+    make_required_directories()
+
+    print("\nChecking integrity of checkpoint file")
+    status = os.path.isfile(checkpoint_file_path) and check_file_status(checkpoint_file_path, checkpoint_file_expected_size,
+                               "The checkpoint file seems to be corrupted. Downloading and extracting again...", False)
+
+    if not status:
+        download_and_extract_checkpoint_file()
+
     status = os.path.isdir(protofiles_folder)
 
     if status:
@@ -721,62 +764,32 @@ def prepare_dr_dataset(save_space=False):
         status = check_folder_status(protofiles_folder, num_of_train_proto_files + num_of_valid_proto_files,
                                      "All of the training and validation protofiles are present in place",
                                      "Couldn't complete the preparation of training and validation proto files."
-                                     "Trying again...")
+                                     "Trying again...", False)
+        if status:
+            return
 
-        if not status:
+    status = os.path.exists(main_zip_file)
 
-            status = os.path.isdir(processed_images_folder)
+    if status:
+        print("\nFound concatenated training file: {}".format(main_zip_file))
+        status = check_file_status(main_zip_file, main_zip_file_size,
+                                   "Concatenation of training zip files was unsuccessful. "
+                                   "Trying again...",
+                                   False)
 
-            if status:
-                print("\nFound processed images folder: {}".format(processed_images_folder))
-                status = check_folder_status(processed_images_folder, num_of_processed_images,
-                                             "All processed images are present in place",
-                                             "Couldn't find all of the processed images. Trying again...", False)
+    if not status:
+        status = prepare_concatenated_zip_file()
 
-                if not status:
+    if status:
+        status = extract_raw_training_files()
 
-                    status = os.path.isdir(raw_images_folder)
+    if status:
+        status = extract_labels_file()
 
-                    if status:
-                        print("\nFound raw images folder: {}".format(raw_images_folder))
-                        status = check_folder_status(raw_images_folder, num_of_raw_images, "All raw images are present in place",
-                                                     "Couldn't find all of the extracted raw images. Trying again...", False)
+    if status:
+        process_training_and_validation_images()
 
-                        if not status:
-
-                            status = os.path.exists(main_zip_file)
-
-                            if status:
-                                print("\nFound concatenated training file: {}".format(main_zip_file))
-                                status = check_file_status(main_zip_file, main_zip_file_size,
-                                                           "Concatenation of training zip files was unsuccessful. "
-                                                           "Trying again...",
-                                                           False)
-
-                                if not status:
-                                    status = prepare_concatenated_zip_file()
-
-                                if status:
-                                    status = extract_raw_training_files()
-
-                                if status:
-                                    status = extract_labels_file()
-
-                                if status:
-                                    process_training_and_validation_images()
-
-                        else:
-                            status = extract_labels_file()
-
-                            if status:
-                                process_training_and_validation_images()
-
-                else:
-
-                    make_training_and_validation_proto_files()
-
-    else:
-
+    if status:
         make_training_and_validation_proto_files()
 
     return

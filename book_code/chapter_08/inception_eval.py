@@ -132,7 +132,7 @@ def _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op):
 
 def evaluate(dataset):
     """Evaluate model on Dataset for a number of steps."""
-    with tf.Graph().as_default(), tf.device('/cpu:0'):
+    with tf.Graph().as_default():
         # Get images and labels from the dataset.
         images, labels = image_processing.inputs(dataset)
 

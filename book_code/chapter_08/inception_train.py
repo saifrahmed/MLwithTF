@@ -25,6 +25,9 @@ import re
 import time
 
 import numpy as np
+
+num_of_gpus = len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
+
 import tensorflow as tf
 
 from book_code.chapter_08 import image_processing
@@ -42,7 +45,7 @@ tf.app.flags.DEFINE_string('subset', 'train',
                            """Either 'train' or 'validation'.""")
 
 # Flags governing the hardware employed for running TensorFlow.
-tf.app.flags.DEFINE_integer('num_gpus', 1,
+tf.app.flags.DEFINE_integer('num_gpus', num_of_gpus,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")

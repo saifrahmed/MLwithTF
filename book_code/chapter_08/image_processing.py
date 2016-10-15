@@ -39,12 +39,15 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import os
+
+num_of_gpus = len(os.environ["CUDA_VISIBLE_DEVICES"].split(","))
 
 import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('batch_size', 32,
+tf.app.flags.DEFINE_integer('batch_size', 32 * num_of_gpus,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('image_size', 299,
                             """Provide square images of this size.""")
