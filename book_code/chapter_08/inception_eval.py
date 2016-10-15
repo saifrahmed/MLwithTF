@@ -20,7 +20,7 @@ from __future__ import print_function
 
 from datetime import datetime
 import math
-import os.path
+import os.path, sys
 import time
 
 import numpy as np
@@ -106,6 +106,7 @@ def _eval_once(saver, summary_writer, top_1_op, top_5_op, summary_op):
                     duration = time.time() - start_time
                     sec_per_batch = duration / 20.0
                     examples_per_sec = FLAGS.batch_size / sec_per_batch
+                    sys.stdout.flush()
                     print('%s: [%d batches out of %d] (%.1f examples/sec; %.3f'
                           'sec/batch)' % (datetime.now(), step, num_iter,
                                           examples_per_sec, sec_per_batch))

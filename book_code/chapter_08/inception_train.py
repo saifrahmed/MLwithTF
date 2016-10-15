@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import copy
 from datetime import datetime
-import os.path
+import os.path, sys
 import re
 import time
 
@@ -346,6 +346,7 @@ def train(dataset):
         examples_per_sec = FLAGS.batch_size / float(duration)
         format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                       'sec/batch)')
+        sys.stdout.flush()
         print(format_str % (datetime.now(), step, loss_value,
                             examples_per_sec, duration))
 
