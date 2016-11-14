@@ -199,125 +199,37 @@ with graph.as_default():
     test_prediction = tf.nn.softmax(nn_model(tf_test_dataset, weights, biases, TRAIN=False))
     random_prediction = tf.nn.softmax(nn_model(tf_random_dataset, weights, biases, TRAIN=False))
 
-#modelRestoreFile = os.path.realpath('../notMNIST_ann')
-modelRestoreFile = None
-modelSaveFile = os.path.realpath('../notMNIST_ann')
-#evaluateFile = '/home/shams/Desktop/test_images_2/MDEtMDEtMDAudHRm.png'
-evaluateFile = None
+modelRestoreFile = os.path.realpath('../notMNIST_ann')
 
-try:
-    opts, args = getopt.getopt(sys.argv[1:],"ur:s:e:",["modelRestoreFile=","modelSaveFile=","evaluateFile="])
-except getopt.GetoptError:
-    print 'ann_benchmark.py -r <path to model file to restore from>'
-    print 'ann_benchmark.py -s <destination to persist model file to>'
-    sys.exit(2)
-for opt, arg in opts:
-    if opt == '-u':
-        print 'ann_benchmark usage:'
-        print 'ann_benchmark.py -r <path to model file to restore from>'
-        print 'ann_benchmark.py -s <destination to persist model file to>'
-        sys.exit()
-    elif opt in ("-r", "--modelRestoreFile"):
-        modelRestoreFile = arg
-    elif opt in ("-s", "--modelSaveFile"):
-        modelSaveFile = arg
-    elif opt in ("-e", "--evaluateFile"):
-        evaluateFile = arg
 
-print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-if (modelRestoreFile is not None):
+def evaluate_cifar_10_image(image_file):
+    dictionary = {0: 'airplane',
+                  1: 'automobile',
+                  2: 'bird',
+                  3: 'cat',
+                  4: 'deer',
+                  5: 'dog',
+                  6: 'frog',
+                  7: 'horse',
+                  8: 'ship',
+                  9: 'truck',}
+
     with tf.Session(graph=graph) as session:
         tf.initialize_all_variables().run()
         saver = tf.train.Saver()
         print "Restore Session from " + modelRestoreFile
         saver.restore(session, modelRestoreFile)
         print("Model restored from " + modelRestoreFile)
+        image = (image_file.astype(float) -
+                      255 / 2) / 255
+        random_data = np.ndarray((1, image_size, image_size, num_channels), dtype=np.float32)
+        random_data[0, :, :, :] = image
+        feed_dict = {tf_random_dataset: random_data}
+        output = session.run(
+            [random_prediction], feed_dict=feed_dict)
+        for i, smx in enumerate(output):
+            prediction = smx[0].argmax(axis=0)
+            print 'The prediction is: %d' % (prediction)
 
-        print test_prediction
-        print test_prediction.eval().shape
-        print dataset.test_labels.shape
+            return dictionary[prediction]
 
-        for i,smx in enumerate(test_prediction.eval()):
-            actual=dataset.test_labels[i].argmax(axis=0)
-            predicted=smx.argmax(axis=0)
-            print i, "Actual", actual, "Prediction", predicted, "Correct" if actual==predicted else "Incorrect"
-        print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), dataset.test_labels))
-
-else:
-    print "Run NEW session"
-    with tf.Session(graph=graph) as session:
-        # saving graph
-        merged = tf.merge_all_summaries()
-        writer = tf.train.SummaryWriter(log_location, session.graph_def)
-
-        tf.initialize_all_variables().run()
-        saver = tf.train.Saver()
-
-        print("Initialized")
-
-        for step in range(num_steps):
-
-            if 30000 < step < 80000:
-                learning_rate = 0.02 / 5
-            elif 80000 <= step < 200000:
-                learning_rate = 0.02 / 10
-            else:
-                learning_rate = 0.02
-
-            sys.stdout.write('Training on batch %d of %d\r' % (step + 1, num_steps))
-            sys.stdout.flush()
-            # Pick an offset within the training data, which has been randomized.
-            # Note: we could use better randomization across epochs.
-            offset = (step * batch_size) % (dataset.train_labels.shape[0] - batch_size)
-            # Generate a minibatch.
-            batch_data = dataset.train_dataset[offset:(offset + batch_size), :]
-            batch_labels = dataset.train_labels[offset:(offset + batch_size), :]
-            # Prepare a dictionary telling the session where to feed the minibatch.
-            # The key of the dictionary is the placeholder node of the graph to be fed,
-            # and the value is the numpy array to feed to it.
-            feed_dict = {tf_train_dataset: batch_data, tf_train_labels: batch_labels,
-                         learning_rate_decayed: learning_rate}
-            #print feed_dict
-            summary_result, _, l, predictions = session.run(
-                [merged, optimizer, loss, train_prediction], feed_dict=feed_dict)
-
-            writer.add_summary(summary_result, step)
-
-            if (step % data_showing_step == 0):
-                logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f Learning Rate: %f' % (
-                    step, accuracy(predictions, batch_labels), accuracy(
-                    valid_prediction.eval(), dataset.valid_labels), l,
-                   learning_rate))
-                #logger.info('Step %03d  Acc Minibatch: %03.2f%%  Acc Val: %03.2f%%  Minibatch loss %f' % (
-                #    step, accuracy(predictions, batch_labels), -1.0, l))
-        if (modelSaveFile is not None):
-            save_path = saver.save(session, modelSaveFile)
-            print("Model saved in file: %s" % save_path)
-        else:
-            print("Trained Model discarded, no save details provided")
-        print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(), dataset.test_labels))
-
-if (evaluateFile is not None):
-    print "We wish to evaluate the file " + evaluateFile
-
-    if (modelRestoreFile is not None):
-        with tf.Session(graph=graph) as session:
-            tf.initialize_all_variables().run()
-            saver = tf.train.Saver()
-            print "Restore Session from " + modelRestoreFile
-            saver.restore(session, modelRestoreFile)
-            print("Model restored from " + modelRestoreFile)
-
-            image = (ndimage.imread(evaluateFile).astype(float) -
-                          255 / 2) / 255
-            image = image.reshape((image_size, image_size, num_channels)).astype(np.float32)
-            random_data = np.ndarray((1, image_size, image_size, num_channels), dtype=np.float32)
-            random_data[0, :, :, :] = image
-
-            feed_dict = {tf_random_dataset: random_data}
-            output = session.run(
-                [random_prediction], feed_dict=feed_dict)
-
-            for i, smx in enumerate(output):
-                prediction = smx[0].argmax(axis=0)
-                print 'The prediction is: %d' % (prediction)
