@@ -29,6 +29,26 @@ output_path = os.path.realpath('../../datasets/TimeSeries')
 if not os.path.isdir(os.path.realpath('../../datasets/TimeSeries')):
     os.makedirs(output_path)
 
+
+def show_plot(key="", show=True):
+    fig = plt.figure()
+    fig.set_figwidth(20)
+    fig.set_figheight(15)
+
+    for code in codes:
+        index = code.split("/")[1]
+        if key and len(key) > 0:
+            label = "{}_{}".format(index, key)
+        else:
+            label = index
+        _ = plt.plot(closings[label], label=label)
+
+    _ = plt.legend(loc='upper right')
+
+    if show:
+        plt.show()
+
+
 closings = pd.DataFrame()
 
 for code in codes:
@@ -41,30 +61,11 @@ for code in codes:
     data = np.array(dataset_data['data'])
     closings[index] = pd.Series(data[:, 1].astype(float))
     closings[index + "_scaled"] = closings[index] / max(closings[index])
+    closings[index + "_log_return"] = np.log(closings[index] / closings[index].shift())
 
-closings.fillna(method='ffill')
-closings.describe(include='all')
+closings = closings.fillna(method='ffill')
+# closings.describe(include='all')
 
-fig = plt.figure()
-fig.set_figwidth(20)
-fig.set_figheight(15)
-
-for code in codes:
-    index = code.split("/")[1]
-    _ = plt.plot(closings[index], label=index)
-
-_ = plt.legend(loc='upper right')
-
-plt.show()
-
-fig = plt.figure()
-fig.set_figwidth(20)
-fig.set_figheight(15)
-
-for code in codes:
-    index = code.split("/")[1]
-    _ = plt.plot(closings[index + "_scaled"], label=index + "_scaled")
-
-_ = plt.legend(loc='upper right')
-
-plt.show()
+show_plot("")
+show_plot("scaled")
+show_plot("log_return")
