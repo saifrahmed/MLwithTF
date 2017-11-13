@@ -67,8 +67,7 @@ for code in codes:
     closings[index + "_scaled"] = closings[index] / max(closings[index])
     closings[index + "_log_return"] = np.log(closings[index] / closings[index].shift())
 
-closings = closings.fillna(method='ffill')
-# closings.describe(include='all')
+closings = closings.fillna(method='ffill')  # Fill the gaps in data
 
 show = False
 
@@ -76,7 +75,7 @@ show_plot("", show=show)
 show_plot("scaled", show=show)
 show_plot("log_return", show=show)
 
-# Features selection
+# Features and labels selection
 feature_columns = ['SNPS_log_return_positive', 'SNPS_log_return_negative']
 for i in range(len(codes)):
     index = codes[i].split("/")[1]
