@@ -48,6 +48,11 @@ closings.describe(include='all')
 fig = plt.figure()
 fig.set_figwidth(20)
 fig.set_figheight(15)
+ax1 = fig.add_axes((0.1, 0.2, 0.8, 0.7))
+
+ax1.set_title("Original")
+ax1.set_xlabel('Increment')
+ax1.set_ylabel('Stock Value')
 
 for code in codes:
     index = code.split("/")[1]
@@ -60,6 +65,11 @@ plt.show()
 fig = plt.figure()
 fig.set_figwidth(20)
 fig.set_figheight(15)
+ax1 = fig.add_axes((0.1, 0.2, 0.8, 0.7))
+
+ax1.set_title("Scaled")
+ax1.set_xlabel('Increment')
+ax1.set_ylabel('Stock Value')
 
 for code in codes:
     index = code.split("/")[1]
