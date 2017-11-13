@@ -45,10 +45,10 @@ for code in codes:
 closings.fillna(method='ffill')
 closings.describe(include='all')
 
-fig = plt.figure()
-fig.set_figwidth(20)
-fig.set_figheight(15)
-ax1 = fig.add_axes((0.1, 0.2, 0.8, 0.7))
+fig = plt.figure(figsize=(100, 40))
+#fig.set_figwidth(100)
+#fig.set_figheight(40)
+ax1 =fig.add_axes((0.1, 0.45, 0.4, 0.35))
 
 ax1.set_title("Original")
 ax1.set_xlabel('Increment')
@@ -60,12 +60,7 @@ for code in codes:
 
 _ = plt.legend(loc='upper right')
 
-plt.show()
-
-fig = plt.figure()
-fig.set_figwidth(20)
-fig.set_figheight(15)
-ax1 = fig.add_axes((0.1, 0.2, 0.8, 0.7))
+ax1 = fig.add_axes((0.57, 0.45, 0.4, 0.35))
 
 ax1.set_title("Scaled")
 ax1.set_xlabel('Increment')
